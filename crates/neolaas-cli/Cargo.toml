@@ -20,7 +20,7 @@ thiserror = { workspace = true }
 clap = { workspace = true }
 
 # HTTP client for API calls
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 
 # CLI utilities
 colored = "2.1"
