@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neolaas
+  namespace: infra
+spec:
+  serviceName: neolaas-headless
+  replicas: 3  # Scale to 3 for P2P testing
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: neolaas
+  template:
+    metadata:
+      labels:
+        app: neolaas
+    spec:
+      containers:
+        - name: neolaas
+          image: neolaas:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            # Logging configuration
+            - name: RUST_LOG
+              value: "info,neolaas_server=debug,neolaas::p2p=info,kameo=debug"
+            - name: RUST_BACKTRACE
+              value: "1"
+
+            # API configuration
+            - name: BIND_ADDR
+              value: "0.0.0.0:8080"
+
+            # Etcd configuration
+            - name: ETCD_ENDPOINTS
+              value: "http://etcd.infra.svc.cluster.local:2379"
+
+            # Node identification for actor system
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            # P2P network configuration
+            - name: P2P_PORT
+              value: "9000"
+
+            # Kubernetes DNS-based peer discovery
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: HEADLESS_SERVICE_NAME
+              value: "neolaas-headless"
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+            # Database (optional for now)
+            - name: DATABASE_URL
+              value: postgresql://neolaas:neolaas-dev-password@neolaas-db-rw.infra.svc.cluster.local:5432/neolaas
+
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 9000
+              name: p2p
+              protocol: TCP
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2

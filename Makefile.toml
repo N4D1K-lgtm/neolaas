@@ -1,0 +1,301 @@
+[config]
+default_to_workspace = false
+skip_core_tasks = true
+
+[env]
+CLUSTER_NAME = "infra-dev"
+NAMESPACE = "infra"
+IMAGE_NAME = "neolaas"
+IMAGE_TAG = "dev"
+KIND_CONTEXT = "kind-infra-dev"
+
+###############################################################################
+# Database
+###############################################################################
+
+[tasks.install-cnpg]
+description = "Install CloudNativePG operator"
+command = "kubectl"
+args = [
+  "apply",
+  "-f",
+  "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.22/releases/cnpg-1.22.0.yaml",
+]
+
+[tasks.db-port-forward]
+description = "Port-forward to PostgreSQL (localhost:5432)"
+command = "kubectl"
+args = ["port-forward", "-n", "${NAMESPACE}", "svc/neolaas-db-rw", "5432:5432"]
+
+[tasks.db-migrate]
+description = "Run database migrations"
+env = { "DATABASE_URL" = "postgresql://neolaas:neolaas-dev-password@localhost:5432/neolaas" }
+command = "sqlx"
+args = ["migrate", "run"]
+
+[tasks.db-create-migration]
+description = "Create a new migration file"
+command = "sqlx"
+args = ["migrate", "add", "-r", "${@}"]
+
+[tasks.db-shell]
+description = "Open psql shell to database"
+command = "kubectl"
+args = [
+  "exec",
+  "-it",
+  "-n",
+  "${NAMESPACE}",
+  "neolaas-db-1",
+  "--",
+  "psql",
+  "-U",
+  "neolaas",
+  "-d",
+  "neolaas",
+]
+
+[tasks.db-prepare]
+description = "Generate sqlx-data.json for offline builds"
+env = { "DATABASE_URL" = "postgresql://neolaas:neolaas-dev-password@localhost:5432/neolaas" }
+command = "cargo"
+args = ["sqlx", "prepare", "--workspace"]
+
+###############################################################################
+# Bootstrap
+###############################################################################
+
+[tasks.kind-up]
+description = "Create local kind cluster (idempotent)"
+command = "bash"
+args = ["deploy/bootstrap/kind/up.sh"]
+
+[tasks.kind-down]
+description = "Delete local kind cluster"
+command = "kind"
+args = ["delete", "cluster", "--name", "${CLUSTER_NAME}"]
+
+###############################################################################
+# Build
+###############################################################################
+
+[tasks.build-bin]
+description = "Build Rust neolaas binary"
+command = "cargo"
+args = ["build"]
+
+[tasks.build-image]
+description = "Build neolaas container image"
+command = "docker"
+args = [
+  "build",
+  "-t",
+  "${IMAGE_NAME}:${IMAGE_TAG}",
+  "-f",
+  "images/neolaas/Dockerfile",
+  ".",
+]
+dependencies = ["build-bin"]
+
+[tasks.kind-load-image]
+description = "Load image into kind cluster"
+command = "kind"
+args = [
+  "load",
+  "docker-image",
+  "${IMAGE_NAME}:${IMAGE_TAG}",
+  "--name",
+  "${CLUSTER_NAME}",
+]
+dependencies = ["build-image"]
+
+###############################################################################
+# Deploy
+###############################################################################
+
+[tasks.deploy-base]
+description = "Deploy base cluster resources (namespace, etcd)"
+command = "kubectl"
+args = ["apply", "-k", "deploy/overlays/dev"]
+
+[tasks.deploy-app]
+description = "Deploy neolaas application"
+command = "kubectl"
+args = ["rollout", "restart", "statefulset/neolaas", "-n", "${NAMESPACE}"]
+
+[tasks.deploy]
+description = "Deploy full stack into cluster"
+dependencies = [
+  "kind-up",
+  "install-cnpg",
+  "kind-load-image",
+  "deploy-base",
+  "deploy-app",
+]
+
+###############################################################################
+# Observe
+###############################################################################
+
+[tasks.logs]
+description = "Tail neolaas logs"
+command = "kubectl"
+args = ["logs", "-n", "${NAMESPACE}", "-l", "app=neolaas", "-f", "--tail=100", "--prefix=true"]
+
+[tasks.logs-pod]
+description = "Tail specific pod logs (usage: cargo make logs-pod -- neolaas-0)"
+command = "kubectl"
+args = ["logs", "-n", "${NAMESPACE}", "${@}", "-f"]
+
+[tasks.logs-p2p]
+description = "Tail P2P-related logs only"
+script = '''
+kubectl logs -n ${NAMESPACE} -l app=neolaas -f --prefix=true --tail=50 | grep -E "(neolaas::p2p|P2P network|Peer|PING|PONG)"
+'''
+
+[tasks.status]
+description = "Show cluster + app status"
+command = "kubectl"
+args = ["get", "pods", "-n", "${NAMESPACE}", "-o", "wide"]
+
+[tasks.scale]
+description = "Scale StatefulSet (usage: cargo make scale -- 3)"
+command = "kubectl"
+args = ["scale", "statefulset/neolaas", "-n", "${NAMESPACE}", "--replicas=${@}"]
+
+[tasks.scale-up]
+description = "Scale StatefulSet to 3 replicas"
+command = "kubectl"
+args = ["scale", "statefulset/neolaas", "-n", "${NAMESPACE}", "--replicas=3"]
+
+[tasks.scale-down]
+description = "Scale StatefulSet to 1 replica"
+command = "kubectl"
+args = ["scale", "statefulset/neolaas", "-n", "${NAMESPACE}", "--replicas=1"]
+
+[tasks.etcd-check]
+description = "Check etcd cluster health"
+command = "kubectl"
+args = [
+  "exec",
+  "-n",
+  "${NAMESPACE}",
+  "etcd-0",
+  "--",
+  "etcdctl",
+  "endpoint",
+  "health",
+]
+
+[tasks.etcd-get]
+description = "Get etcd key (usage: cargo make etcd-get -- /neolaas/resource_locks/host/hpe1)"
+command = "kubectl"
+args = [
+  "exec",
+  "-n",
+  "${NAMESPACE}",
+  "etcd-0",
+  "--",
+  "etcdctl",
+  "get",
+  "${@}",
+  "--print-value-only",
+]
+
+[tasks.etcd-watch]
+description = "Watch etcd prefix (usage: cargo make etcd-watch -- /neolaas/)"
+command = "kubectl"
+args = [
+  "exec",
+  "-n",
+  "${NAMESPACE}",
+  "etcd-0",
+  "--",
+  "etcdctl",
+  "watch",
+  "--prefix",
+  "${@}",
+]
+
+###############################################################################
+# Testing API
+###############################################################################
+
+[tasks.port-forward]
+description = "Port-forward API to localhost:8080"
+command = "kubectl"
+args = ["port-forward", "-n", "${NAMESPACE}", "svc/neolaas", "8080:8080"]
+
+[tasks.test-health]
+description = "Test health endpoint"
+script = '''
+curl -f http://localhost:8080/health || echo "Health check failed"
+'''
+
+[tasks.test-create-host]
+description = "Test creating a host actor"
+script = '''
+curl -X POST http://localhost:8080/hosts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "host_id": "test-host-1",
+    "booking_id": "00000000-0000-0000-0000-000000000001",
+    "owner": "test-user",
+    "duration_hours": 24
+  }' | jq
+'''
+
+[tasks.test-provision]
+description = "Test provisioning a host"
+script = '''
+curl -X POST http://localhost:8080/hosts/test-host-1/provision \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "ubuntu-22.04",
+    "config": {"memory": "16GB"}
+  }' | jq
+'''
+
+[tasks.test-status]
+description = "Test getting host status"
+script = '''
+curl http://localhost:8080/hosts/test-host-1/status | jq
+'''
+
+[tasks.test-p2p-stats]
+description = "Test P2P network statistics"
+script = '''
+curl http://localhost:8080/p2p/stats | jq
+'''
+
+[tasks.test-p2p-broadcast]
+description = "Test P2P broadcast message"
+script = '''
+curl -X POST http://localhost:8080/p2p/broadcast \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Hello from Makefile test!"}' | jq
+'''
+
+[tasks.test-all]
+description = "Run all API tests (requires port-forward in another terminal)"
+dependencies = [
+  "test-health",
+  "test-create-host",
+  "test-provision",
+  "test-status",
+  "test-p2p-stats",
+  "test-p2p-broadcast",
+]
+
+[tasks.redeploy]
+description = "Fast rebuild + redeploy"
+dependencies = ["kind-load-image", "deploy-app"]
+
+###############################################################################
+# Cleanup
+###############################################################################
+
+[tasks.reset]
+description = "Delete infra namespace (DANGEROUS)"
+command = "kubectl"
+args = ["delete", "namespace", "${NAMESPACE}"]

@@ -1,0 +1,9 @@
+error: failed to load manifest for workspace member `/home/k1/work/neolaas/crates/neolaas-core`
+referenced by workspace at `/home/k1/work/neolaas/Cargo.toml`
+
+Caused by:
+  failed to parse manifest at `/home/k1/work/neolaas/crates/neolaas-core/Cargo.toml`
+
+Caused by:
+  no targets specified in the manifest
+  either src/lib.rs, src/main.rs, a [lib] section, or [[bin]] section must be present

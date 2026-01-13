@@ -1,0 +1,11 @@
+# Default owners for everything
+* @N4D1K-lgtm
+
+# Database migrations require careful review
+/migrations/ @N4D1K-lgtm
+
+# Kubernetes manifests
+/deploy/ @N4D1K-lgtm
+
+# GitHub workflows
+/.github/ @N4D1K-lgtm

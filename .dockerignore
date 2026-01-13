@@ -1,0 +1,42 @@
+# Build artifacts
+target/
+**/target/
+
+# Git
+.git/
+.gitignore
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development
+*.log
+.env
+.env.local
+
+# Documentation (not needed in image)
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+
+# Local development
+.kind/
+deploy/bootstrap/
+
+# Testing
+tests/
+**/tests/
+
+# Don't ignore migrations and .sqlx (needed for runtime)
+!migrations/
+!.sqlx/

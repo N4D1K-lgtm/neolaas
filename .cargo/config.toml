@@ -1,0 +1,3 @@
+# SQLx configuration for offline builds
+[env]
+SQLX_OFFLINE = "true"

@@ -1,0 +1,21 @@
+/target
+Cargo.lock
+
+# SQLx offline data (commit this for Docker builds)
+# Uncomment to exclude it:
+# .sqlx/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Added by cargo
+#
+# already existing elements were commented out
+
+#/target

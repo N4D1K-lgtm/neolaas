@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      axum:
+        patterns:
+          - "axum*"
+          - "tower*"
+      sqlx:
+        patterns:
+          - "sqlx*"
+      tokio:
+        patterns:
+          - "tokio*"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/images/neolaas"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/images/neolaas-pxe"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

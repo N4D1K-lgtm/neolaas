@@ -1,0 +1,27 @@
+[package]
+name = "neolaas-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "neolaas"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+clap = { workspace = true }
+
+# HTTP client for API calls
+reqwest = { version = "0.12", features = ["json"] }
+
+# CLI utilities
+colored = "2.1"
+indicatif = "0.17"

@@ -1,0 +1,39 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: neolaas-db
+  namespace: infra
+spec:
+  instances: 1
+
+  # Storage configuration
+  storage:
+    size: 1Gi
+    storageClass: standard
+
+  # Bootstrap with initial database and user
+  bootstrap:
+    initdb:
+      database: neolaas
+      owner: neolaas
+      secret:
+        name: neolaas-db-app
+
+  # Monitoring
+  monitoring:
+    enablePodMonitor: false
+
+  # Resources
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  # PostgreSQL configuration
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"

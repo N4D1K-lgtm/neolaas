@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: neolaas
+  namespace: infra
+spec:
+  type: LoadBalancer
+  selector:
+    app: neolaas
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+      protocol: TCP

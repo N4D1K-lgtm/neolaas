@@ -1,0 +1,73 @@
+[workspace]
+members = [
+  "crates/neolaas-core",
+  "crates/neolaas-server",
+  "crates/neolaas-pxe",
+  "crates/neolaas-cli",
+  "crates/neolaas-api",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["neolaas contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/N4D1K-lgtm/neolaas"
+
+[workspace.dependencies]
+tokio = { version = "1.49.0", features = ["full"] }
+futures = "0.3.31"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "2.0"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+
+# actor framework
+kameo = { version = "0.19.2", features = ["remote", "tracing"] }
+
+# web framerwork
+axum = { version = "0.8", features = ["macros", "ws"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "cors"] }
+
+# database
+sqlx = { version = "0.8.6", features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "uuid",
+  "chrono",
+  "migrate",
+] }
+
+# networking
+libp2p = { version = "0.56.0", features = [
+    "serde",
+    "tcp",
+    "quic",
+    "noise",
+    "yamux",
+    "tokio",
+    "mdns",
+    "kad",
+    "identify",
+] }
+etcd-client = "0.17"
+
+# cli
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# utils
+uuid = { version = "1.0", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+neolaas-core = { path = "crates/neolaas-core" }
+neolaas-api = { path = "crates/neolaas-api" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

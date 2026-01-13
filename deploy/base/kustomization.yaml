@@ -1,0 +1,7 @@
+resources:
+  - namespaces.yaml
+  - rbac.yaml
+  - crds
+  - etcd
+  - cnpg
+
