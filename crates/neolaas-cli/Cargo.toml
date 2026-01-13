@@ -23,5 +23,5 @@ clap = { workspace = true }
 reqwest = { version = "0.13", features = ["json"] }
 
 # CLI utilities
-colored = "2.1"
+colored = "3.0"
 indicatif = "0.18"
