@@ -4,7 +4,7 @@ metadata:
   name: neolaas-headless
   namespace: infra
 spec:
-  clusterIP: None  # Headless service
+  clusterIP: None
   selector:
     app: neolaas
   ports:

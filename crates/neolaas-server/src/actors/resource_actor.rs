@@ -6,10 +6,8 @@
 use etcd_client::Client;
 
 /// Utilities for distributed resource locking via etcd.
-#[allow(dead_code)]
 pub struct ResourceUtils;
 
-#[allow(dead_code)]
 impl ResourceUtils {
     /// Acquire a distributed lock on a resource using an etcd lease.
     /// The lock is automatically released if the holder crashes (lease expiration).

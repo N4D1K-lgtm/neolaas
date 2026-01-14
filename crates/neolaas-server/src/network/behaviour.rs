@@ -6,6 +6,7 @@
 //! - mDNS: Automatic local network peer discovery (works well in Kubernetes)
 //! - Kademlia: DHT for peer routing (configured for LAN/datacenter use)
 
+use super::config::NetworkConfig;
 use kameo::remote;
 use libp2p::{identify, kad, mdns, swarm::NetworkBehaviour, PeerId};
 
@@ -22,12 +23,13 @@ impl NeolaasNetworkBehaviour {
     pub fn new(
         local_peer_id: PeerId,
         local_public_key: libp2p::identity::PublicKey,
+        config: &NetworkConfig,
     ) -> Result<Self, std::io::Error> {
         let kameo = remote::Behaviour::new(
             local_peer_id,
             remote::messaging::Config::default()
-                .with_request_timeout(std::time::Duration::from_secs(30))
-                .with_max_concurrent_streams(100),
+                .with_request_timeout(config.kameo_request_timeout)
+                .with_max_concurrent_streams(config.kameo_max_streams as usize),
         );
 
         let identify = identify::Behaviour::new(identify::Config::new(
@@ -43,10 +45,10 @@ impl NeolaasNetworkBehaviour {
         let mut kad_config = kad::Config::default();
 
         kad_config
-            .set_query_timeout(std::time::Duration::from_secs(3)) // Fast failure in LAN
-            .set_parallelism(std::num::NonZeroUsize::new(10).unwrap())
-            .set_publication_interval(Some(std::time::Duration::from_secs(30 * 60)))
-            .set_provider_record_ttl(Some(std::time::Duration::from_secs(60 * 60)))
+            .set_query_timeout(config.kademlia_query_timeout)
+            .set_parallelism(config.kademlia_parallelism)
+            .set_publication_interval(Some(config.kademlia_publication_interval))
+            .set_provider_record_ttl(Some(config.kademlia_provider_ttl))
             .set_kbucket_inserts(kad::BucketInserts::Manual); // etcd controls routing
 
         let mut kademlia = kad::Behaviour::with_config(local_peer_id, store, kad_config);
