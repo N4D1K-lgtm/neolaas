@@ -107,7 +107,3 @@ impl Message<GetStatsMessage> for HealthActor {
         }
     }
 }
-
-/// Deprecated alias for backward compatibility
-#[deprecated(since = "0.2.0", note = "Use HealthActor instead")]
-pub type PingActor = HealthActor;

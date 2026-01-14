@@ -54,7 +54,10 @@ libp2p = { version = "0.56.0", features = [
     "kad",
     "identify",
 ] }
-etcd-client = "0.17"
+etcd-client = { version = "0.17", features = ["raw-channel"] }
+tonic = "0.14"
+hickory-resolver = "0.25"
+http = "1.2"
 
 # cli
 clap = { version = "4.5", features = ["derive", "env"] }

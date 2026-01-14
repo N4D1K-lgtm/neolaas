@@ -4,24 +4,24 @@
 //! and libp2p for peer discovery and communication within a Kubernetes cluster.
 //!
 //! This module contains:
-//! - `init`: Network initialization and swarm event loop
 //! - `behaviour`: libp2p NetworkBehaviour configuration
-//! - `discovery_controller`: Hybrid etcd-Kademlia peer discovery state machine
-//! - `test_actor`: Simple ping/pong actor for health checking
+//! - `config`: Network configuration from environment
+//! - `discovery`: Hybrid etcd-Kademlia peer discovery state machine
+//! - `health`: Health monitoring actor and ping loop
+//! - `init`: Network initialization
+//! - `swarm`: Swarm builder and event loop
+//! - `types`: Shared types (PeerInfo, NetworkState, etc.)
 
 pub mod behaviour;
 pub mod config;
 pub mod discovery;
-pub mod discovery_controller; // Deprecated - for backward compatibility
 pub mod health;
 pub mod init;
 pub mod swarm;
-pub mod test_actor; // Deprecated - for backward compatibility
 pub mod types;
 
 pub use behaviour::NeolaasNetworkBehaviour;
 pub use config::NetworkConfig;
-pub use discovery::{DiscoveryCommand, DiscoveryController, DiscoveryState};
-#[allow(deprecated)]
-pub use health::{HealthActor, PingActor, PingMessage};
+pub use discovery::{create_etcd_client, DiscoveryCommand, DiscoveryController, DiscoveryState};
+pub use health::{HealthActor, PingMessage};
 pub use types::{ConnectionStatus, NetworkState, PeerConnectionState, PeerInfo};

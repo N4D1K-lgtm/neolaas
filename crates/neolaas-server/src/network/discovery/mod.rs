@@ -13,4 +13,4 @@ mod phases;
 pub use controller::{
     run_discovery_controller, DiscoveryCommand, DiscoveryController, DiscoveryState,
 };
-pub use etcd::PeerMetadata;
+pub use etcd::{create_etcd_client, PeerMetadata};

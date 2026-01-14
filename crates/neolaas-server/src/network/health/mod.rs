@@ -6,8 +6,7 @@ mod actor;
 mod messages;
 mod ping_loop;
 
-#[allow(deprecated)]
-pub use actor::{HealthActor, PingActor}; // PingActor is deprecated alias
+pub use actor::HealthActor;
 pub use messages::{
     AckReply, BroadcastMessage, GetStatsMessage, PingMessage, PongReply, StatsReply,
 };

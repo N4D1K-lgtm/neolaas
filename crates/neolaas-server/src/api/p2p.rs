@@ -2,8 +2,8 @@
 //!
 //! HTTP endpoints for P2P network statistics and broadcast messaging.
 
-use crate::api::AppState;
-use crate::network::test_actor::{BroadcastMessage, GetStatsMessage};
+use super::state::AppState;
+use crate::network::health::{BroadcastMessage, GetStatsMessage, HealthActor};
 use axum::{extract::State, http::StatusCode, response::Json};
 use futures::TryStreamExt;
 use kameo::prelude::*;
@@ -62,8 +62,7 @@ pub async fn get_p2p_stats(
 
     // Query remote peers for their stats
     let mut remote_peers = Vec::new();
-    let remote_ping_actors =
-        RemoteActorRef::<crate::network::test_actor::PingActor>::lookup_all("ping");
+    let remote_ping_actors = RemoteActorRef::<HealthActor>::lookup_all("ping");
     futures::pin_mut!(remote_ping_actors);
 
     while let Ok(Some(remote_ping)) = remote_ping_actors.try_next().await {
@@ -137,8 +136,7 @@ pub async fn broadcast_message(
 
     tracing::debug!(content = %req.content, "Broadcasting message");
 
-    let remote_ping_actors =
-        RemoteActorRef::<crate::network::test_actor::PingActor>::lookup_all("ping");
+    let remote_ping_actors = RemoteActorRef::<HealthActor>::lookup_all("ping");
     futures::pin_mut!(remote_ping_actors);
 
     let mut peers_reached = 0;
