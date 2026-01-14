@@ -1,4 +1,6 @@
-//! API handlers
+//! HTTP API Handlers
+//!
+//! REST API endpoints for host management, health checks, and P2P statistics.
 
 use crate::actors::host_actor::{GetHostStatus, HostActor, HostStatus, ProvisionHost};
 use crate::api_p2p::{broadcast_message, get_p2p_stats};
@@ -28,12 +30,14 @@ pub struct AppState {
     pub actors: Arc<RwLock<HashMap<String, ActorRef<HostActor>>>>,
     pub peer_id: Option<PeerId>,
     pub ping_actor: Option<ActorRef<PingActor>>,
+    pub readiness: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Create API router
 pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health_check))
+        .route("/ready", get(readiness_check))
         .route("/hosts", post(create_host_actor))
         .route("/hosts/{host_id}/provision", post(provision_host))
         .route("/hosts/{host_id}/status", get(get_host_status))
@@ -42,9 +46,39 @@ pub fn create_router(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// Health check endpoint
-async fn health_check() -> &'static str {
-    "OK"
+/// Liveness probe endpoint. Verifies etcd connection is healthy.
+async fn health_check(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
+    let etcd_check = tokio::time::timeout(
+        tokio::time::Duration::from_secs(2),
+        async {
+            let mut client = state.etcd_client.write().await;
+            client.status().await
+        }
+    ).await;
+
+    match etcd_check {
+        Ok(Ok(_)) => Ok("OK"),
+        Ok(Err(e)) => {
+            tracing::warn!(error = %e, "etcd health check failed");
+            Err(StatusCode::SERVICE_UNAVAILABLE)
+        }
+        Err(_) => {
+            tracing::warn!("etcd health check timed out");
+            Err(StatusCode::REQUEST_TIMEOUT)
+        }
+    }
+}
+
+/// Readiness probe endpoint. Returns OK after discovery convergence completes.
+async fn readiness_check(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
+    if state
+        .readiness
+        .load(std::sync::atomic::Ordering::Acquire)
+    {
+        Ok("READY")
+    } else {
+        Err(StatusCode::SERVICE_UNAVAILABLE)
+    }
 }
 
 /// Request to create a new host actor
@@ -64,12 +98,11 @@ struct CreateHostResponse {
     message: String,
 }
 
-/// Create a new host actor
 async fn create_host_actor(
     State(state): State<AppState>,
     Json(req): Json<CreateHostRequest>,
 ) -> Result<Json<CreateHostResponse>, (StatusCode, String)> {
-    tracing::info!("Creating host actor for {}", req.host_id);
+    tracing::debug!(host_id = %req.host_id, "Creating host actor");
 
     // Check if actor already exists
     {
@@ -150,13 +183,12 @@ struct ProvisionRequest {
     config: Option<serde_json::Value>,
 }
 
-/// Provision a host
 async fn provision_host(
     State(state): State<AppState>,
     Path(host_id): Path<String>,
     Json(req): Json<ProvisionRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    tracing::info!("Provisioning host {} with image {}", host_id, req.image);
+    tracing::debug!(host_id = %host_id, image = %req.image, "Provisioning host");
 
     // Get actor reference
     let actor_ref = {
@@ -189,12 +221,11 @@ async fn provision_host(
     })))
 }
 
-/// Get host status
 async fn get_host_status(
     State(state): State<AppState>,
     Path(host_id): Path<String>,
 ) -> Result<Json<HostStatus>, (StatusCode, String)> {
-    tracing::info!("Getting status for host {}", host_id);
+    tracing::trace!(host_id = %host_id, "Getting host status");
 
     // Get actor reference
     let actor_ref = {

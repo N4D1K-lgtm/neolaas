@@ -1,6 +1,7 @@
-//! Test actor for P2P messaging
+//! Ping Actor for P2P Health Monitoring
 //!
-//! Provides a simple ping/pong actor for testing peer-to-peer communication
+//! Simple actor for peer-to-peer ping/pong exchanges and broadcast messages.
+//! Used for health monitoring and basic connectivity verification.
 
 use kameo::{
     message::{Context, Message},
@@ -11,11 +12,13 @@ use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::trace;
 
-/// Simple test actor for P2P messaging
+/// Actor that handles ping/pong health checks and broadcast messages.
 #[derive(Actor, RemoteActor)]
 pub struct PingActor {
+    /// Identifier for this node (used in responses)
+    #[allow(dead_code)]
     pub node_id: String,
     pub ping_count: Arc<RwLock<u64>>,
     pub pong_count: Arc<RwLock<u64>>,
@@ -55,18 +58,13 @@ impl Message<PingMessage> for PingActor {
         msg: PingMessage,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        // Increment ping received count
         let mut ping_count = self.ping_count.write().await;
         *ping_count += 1;
 
-        info!(
-            target: "neolaas::p2p::actor",
-            local_node = %self.node_id,
+        trace!(
             remote_node = %msg.from_node,
-            remote_peer = %msg.from_peer,
             sequence = msg.sequence,
-            message_type = "PING",
-            "Received PING message"
+            "Ping received"
         );
 
         PongReply {
@@ -103,14 +101,10 @@ impl Message<BroadcastMessage> for PingActor {
         msg: BroadcastMessage,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        info!(
-            target: "neolaas::p2p::actor",
-            local_node = %self.node_id,
+        trace!(
             remote_node = %msg.from_node,
-            remote_peer = %msg.from_peer,
             content = %msg.content,
-            message_type = "BROADCAST",
-            "Received BROADCAST message"
+            "Broadcast received"
         );
 
         AckReply {

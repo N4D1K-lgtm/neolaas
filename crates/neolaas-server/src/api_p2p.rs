@@ -1,4 +1,6 @@
-//! P2P API endpoints
+//! P2P API Endpoints
+//!
+//! HTTP endpoints for P2P network statistics and broadcast messaging.
 
 use crate::api::AppState;
 use crate::network::test_actor::{BroadcastMessage, GetStatsMessage};
@@ -85,7 +87,7 @@ pub async fn get_p2p_stats(
                 });
             }
             Err(e) => {
-                tracing::warn!("Failed to get stats from remote peer: {}", e);
+                tracing::debug!(error = %e, "Failed to get stats from remote peer");
                 remote_peers.push(RemotePeerStats {
                     peer_id: remote_ping
                         .id()
@@ -133,9 +135,8 @@ pub async fn broadcast_message(
         "P2P network not initialized".to_string(),
     ))?;
 
-    tracing::info!("Broadcasting message: {}", req.content);
+    tracing::debug!(content = %req.content, "Broadcasting message");
 
-    // Look up all remote ping actors
     let remote_ping_actors =
         RemoteActorRef::<crate::network::test_actor::PingActor>::lookup_all("ping");
     futures::pin_mut!(remote_ping_actors);
@@ -144,7 +145,6 @@ pub async fn broadcast_message(
     let mut peers_failed = 0;
 
     while let Ok(Some(remote_ping)) = remote_ping_actors.try_next().await {
-        // Skip self
         if remote_ping.id().peer_id() == Some(&peer_id) {
             continue;
         }
@@ -159,7 +159,7 @@ pub async fn broadcast_message(
         match remote_ping.ask(&broadcast_msg).await {
             Ok(ack) => {
                 if ack.success {
-                    tracing::info!("Broadcast acknowledged by {}", ack.from_node);
+                    tracing::trace!(from_node = %ack.from_node, "Broadcast acknowledged");
                     peers_reached += 1;
                 } else {
                     peers_failed += 1;
@@ -171,10 +171,10 @@ pub async fn broadcast_message(
                     .peer_id()
                     .map(|p| p.to_base58())
                     .unwrap_or_else(|| "unknown".to_string());
-                tracing::warn!(
-                    "Failed to broadcast to peer {}...: {}",
-                    &peer_id_str[46.min(peer_id_str.len())..],
-                    e
+                tracing::debug!(
+                    peer_id_short = &peer_id_str[46.min(peer_id_str.len())..],
+                    error = %e,
+                    "Broadcast failed"
                 );
                 peers_failed += 1;
             }
