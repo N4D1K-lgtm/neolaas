@@ -27,6 +27,7 @@ tower-http = { workspace = true }
 sqlx = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+backoff = { workspace = true }
 
 neolaas-core = { workspace = true }
 

@@ -1,4 +1,7 @@
-//! Host Actor - Manages a single physical host
+//! Host Actor
+//!
+//! Manages the lifecycle of a single physical host allocation, including
+//! provisioning state transitions persisted to etcd.
 
 use crate::models::{HostAllocation, ProvisionState};
 use etcd_client::Client;
@@ -9,19 +12,16 @@ use kameo::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::debug;
 use uuid::Uuid;
 
-/// Actor representing a single host
+/// Actor managing a single host allocation.
 #[derive(Actor)]
 pub struct HostActor {
-    /// Unique host identifier
     pub host_id: String,
-    /// Current allocation
     pub allocation: HostAllocation,
-    /// Etcd client
     etcd_client: Arc<RwLock<Client>>,
-    /// Node ID
+    #[allow(dead_code)]
     node_id: String,
 }
 
@@ -90,15 +90,12 @@ impl Message<ProvisionHost> for HostActor {
         msg: ProvisionHost,
         _ctx: &mut Context<Self, Self::Reply>,
     ) -> Self::Reply {
-        info!(
-            "Provisioning host {} with image {}",
-            self.host_id, msg.image
-        );
+        debug!(host_id = %self.host_id, image = %msg.image, "Provisioning host");
 
         self.update_provision_state(ProvisionState::Provisioning)
             .await?;
 
-        // Simulate provisioning work
+        // Simulate provisioning work (placeholder for actual provisioning logic)
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         self.update_provision_state(ProvisionState::Ready).await?;

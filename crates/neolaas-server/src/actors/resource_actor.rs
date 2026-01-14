@@ -1,14 +1,18 @@
-//! Resource actor utilities (simplified for now)
+//! Resource Locking Utilities
 //!
-//! This module will contain shared utilities for resource actors
+//! Provides distributed locking via etcd leases for resource coordination.
+//! Currently unused but available for future resource management features.
 
 use etcd_client::Client;
 
-/// Shared utilities for resource actors
+/// Utilities for distributed resource locking via etcd.
+#[allow(dead_code)]
 pub struct ResourceUtils;
 
+#[allow(dead_code)]
 impl ResourceUtils {
-    /// Acquire etcd lock with lease
+    /// Acquire a distributed lock on a resource using an etcd lease.
+    /// The lock is automatically released if the holder crashes (lease expiration).
     pub async fn acquire_lock(
         client: &mut Client,
         resource_type: &str,
@@ -16,7 +20,6 @@ impl ResourceUtils {
         node_id: &str,
         ttl_seconds: i64,
     ) -> Result<i64, Box<dyn std::error::Error + Send + Sync>> {
-        // Create lease
         let lease = client.lease_grant(ttl_seconds, None).await?;
         let lease_id = lease.id();
 
@@ -29,29 +32,28 @@ impl ResourceUtils {
         })
         .to_string();
 
-        // Put lock with lease
         let put_opts = etcd_client::PutOptions::new().with_lease(lease_id);
         client
             .put(lock_key.as_bytes(), lock_value.as_bytes(), Some(put_opts))
             .await?;
 
-        tracing::info!(
-            "Acquired lock for {}:{} (lease: {})",
-            resource_type,
-            resource_id,
-            lease_id
+        tracing::debug!(
+            resource_type = %resource_type,
+            resource_id = %resource_id,
+            lease_id = lease_id,
+            "Acquired resource lock"
         );
 
         Ok(lease_id)
     }
 
-    /// Release etcd lock
+    /// Release a distributed lock by revoking its lease.
     pub async fn release_lock(
         client: &mut Client,
         lease_id: i64,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         client.lease_revoke(lease_id).await?;
-        tracing::info!("Released lock (lease: {})", lease_id);
+        tracing::debug!(lease_id = lease_id, "Released resource lock");
         Ok(())
     }
 }

@@ -1,16 +1,21 @@
-//! Neolaas Server - Distributed Host Allocator
+//! Neolaas Server - Distributed Baremetal Host Allocator
+//!
+//! Entry point for the neolaas server. Initializes:
+//! - Tracing/logging with configurable levels via RUST_LOG
+//! - etcd client for distributed state
+//! - P2P network for peer discovery and actor messaging
+//! - HTTP API server for client requests
 
 use etcd_client::Client;
 use neolaas_server::api;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, level_filters::LevelFilter};
+use tracing::{debug, error, info, level_filters::LevelFilter};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
     tracing_subscriber::registry()
         .with(fmt::layer())
         .with(
@@ -20,9 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .init();
 
-    info!("Starting Neolaas Server...");
+    info!("Starting Neolaas Server");
 
-    // Get configuration from environment
     let etcd_endpoints = std::env::var("ETCD_ENDPOINTS")
         .unwrap_or_else(|_| "http://127.0.0.1:2379".to_string())
         .split(',')
@@ -35,38 +39,59 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("neolaas-node-{}", uuid::Uuid::new_v4())
     });
 
-    info!("Node ID: {}", node_id);
-    info!("Etcd endpoints: {:?}", etcd_endpoints);
-    info!("Bind address: {}", bind_addr);
+    info!(
+        node_id = %node_id,
+        bind_addr = %bind_addr,
+        "Configuration loaded"
+    );
+    debug!(etcd_endpoints = ?etcd_endpoints, "etcd endpoints");
 
-    // Connect to etcd
-    info!("Connecting to etcd...");
     let etcd_client = Client::connect(&etcd_endpoints, None).await?;
     let etcd_client = Arc::new(RwLock::new(etcd_client));
-    info!("Connected to etcd");
+    debug!("Connected to etcd");
 
-    // Initialize P2P network
-    info!("Initializing P2P network...");
-    let (peer_id, ping_actor) = neolaas_server::network::init::initialize_p2p_network(node_id.clone()).await?;
-    info!("P2P network initialized with peer ID: {}", peer_id);
+    let (peer_id, ping_actor, shutdown_tx, readiness) =
+        neolaas_server::network::init::initialize_p2p_network(node_id.clone()).await?;
+    info!(peer_id = %peer_id, "P2P network initialized");
 
-    // Create shared state
     let state = api::AppState {
         etcd_client: etcd_client.clone(),
         node_id: node_id.clone(),
         actors: Arc::new(RwLock::new(HashMap::new())),
         peer_id: Some(peer_id),
         ping_actor: Some(ping_actor),
+        readiness,
     };
 
-    // Create API router
     let app = api::create_router(state);
 
-    // Start server
-    info!("Starting API server on {}", bind_addr);
+    info!(bind_addr = %bind_addr, "Starting API server");
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
 
-    axum::serve(listener, app).await?;
+    let _server_handle = tokio::spawn(async move {
+        if let Err(e) = axum::serve(listener, app).await {
+            error!(error = %e, "Server error");
+        }
+    });
 
+    let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
+
+    tokio::select! {
+        _ = sigterm.recv() => {
+            info!("Received SIGTERM, initiating shutdown");
+        }
+        _ = sigint.recv() => {
+            info!("Received SIGINT, initiating shutdown");
+        }
+    }
+
+    debug!("Signaling DiscoveryController to shutdown");
+    let _ = shutdown_tx.send(());
+
+    // Allow time for graceful shutdown (lease revocation and DELETE propagation)
+    tokio::time::sleep(tokio::time::Duration::from_secs(7)).await;
+
+    info!("Shutdown complete");
     Ok(())
 }
