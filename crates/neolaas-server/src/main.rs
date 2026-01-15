@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     debug!("Connected to etcd");
 
     let (peer_id, ping_actor, sharding_coordinator, shutdown_tx, readiness) =
-        neolaas_server::network::init::initialize_p2p_network(node_id.clone()).await?;
+        neolaas_server::network::init::initialize_p2p_network(node_id.clone(), etcd_client.clone()).await?;
     info!(peer_id = %peer_id, "P2P network initialized");
 
     let state = api::AppState {

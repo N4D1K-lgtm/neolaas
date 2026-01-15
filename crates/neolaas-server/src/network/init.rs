@@ -8,24 +8,32 @@
 //! - Command processing from [`DiscoveryController`]
 //! - Periodic ping loop for peer health monitoring
 //! - ShardingCoordinator for machine actor distribution
+//! - MachineActorManager for distributed machine lifecycle management
 
 use super::{
     discovery::DiscoveryCommand,
     health::HealthActor,
+    machines::spawn_machine_actor_manager,
     sharding::{ShardingCoordinator, TopologyChanged},
     NetworkState,
 };
+use etcd_client::Client;
 use kameo::prelude::*;
 use libp2p::PeerId;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
 /// Initialize the P2P network
 ///
+/// Args:
+/// - node_id: Unique identifier for this node
+/// - etcd_client: Shared etcd client for MachineActorManager
+///
 /// Returns: (PeerId, HealthActor ActorRef, ShardingCoordinator ActorRef, Shutdown sender, Readiness state)
 pub async fn initialize_p2p_network(
     node_id: String,
+    etcd_client: Arc<RwLock<Client>>,
 ) -> Result<
     (
         PeerId,
@@ -78,16 +86,30 @@ pub async fn initialize_p2p_network(
         "ShardingCoordinator spawned"
     );
 
-    // Bridge the sharding channel to the actor
+    // Spawn MachineActorManager with sharding coordinator
+    let machine_topology_tx = spawn_machine_actor_manager(
+        local_peer_id,
+        sharding_ref.clone(),
+        etcd_client,
+    );
+    debug!("MachineActorManager spawned");
+
+    // Bridge the sharding channel to the actor and notify MachineActorManager
     let sharding_ref_for_bridge = sharding_ref.clone();
     tokio::spawn(async move {
         while let Some(peers) = sharding_rx.recv().await {
+            // Update ShardingCoordinator
             if let Err(e) = sharding_ref_for_bridge
                 .ask(TopologyChanged { peers })
                 .send()
                 .await
             {
                 warn!(error = %e, "Failed to send topology update to ShardingCoordinator");
+            }
+
+            // Notify MachineActorManager to rebalance
+            if machine_topology_tx.send(()).is_err() {
+                warn!("Failed to notify MachineActorManager of topology change");
             }
         }
         debug!("Sharding channel bridge closed");
