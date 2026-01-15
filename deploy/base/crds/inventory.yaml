@@ -1,0 +1,278 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: machines.neolaas.io
+spec:
+  group: neolaas.io
+  names:
+    categories: []
+    kind: Machine
+    plural: machines
+    shortNames: []
+    singular: machine
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.adminState
+      name: Admin State
+      type: string
+    - jsonPath: .spec.cluster
+      name: Cluster
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for MachineSpec via `CustomResource`
+        properties:
+          spec:
+            description: |-
+              Machine represents a physical server in the lab inventory.
+
+              This CRD captures static configuration that rarely changes: - Network interfaces and their hardwired switch port connections - BMC/IPMI configuration (dedicated or in-band) - Administrative controls (maintenance mode, cluster assignment)
+
+              Runtime state (power status, booking status, provisioning progress) is managed separately by neolaas-server.
+            properties:
+              adminState:
+                default: available
+                description: Administrative state controlling machine availability.
+                enum:
+                - available
+                - maintenance
+                - reserved
+                - decommissioned
+                type: string
+              bmc:
+                description: BMC/IPMI configuration for out-of-band management.
+                properties:
+                  address:
+                    description: BMC IP address.
+                    type: string
+                  credentialsSecret:
+                    description: Reference to Secret with `username` and `password` keys.
+                    type: string
+                  inBand:
+                    default: false
+                    description: Whether BMC uses in-band management (no dedicated port).
+                    type: boolean
+                  protocol:
+                    default: redfish
+                    description: Management protocol.
+                    enum:
+                    - redfish
+                    - ipmi
+                    - ilo
+                    - idrac
+                    type: string
+                required:
+                - address
+                - credentialsSecret
+                type: object
+              cluster:
+                default: default
+                description: Cluster assignment for multi-cluster deployments.
+                type: string
+              interfaces:
+                description: Network interfaces and their hardwired switch port connections. This represents the physical cabling - each NIC is connected to a specific switch port.
+                items:
+                  description: A physical network interface and its hardwired switch port connection.
+                  properties:
+                    mac:
+                      description: MAC address of this interface.
+                      type: string
+                    pxe:
+                      default: false
+                      description: Whether this is the PXE boot interface.
+                      type: boolean
+                    switchPort:
+                      description: The switch and port this interface is physically cabled to.
+                      properties:
+                        port:
+                          description: Port identifier (e.g., "Ethernet1/1", "Gi0/1").
+                          type: string
+                        switch:
+                          description: Name of the Switch CR.
+                          type: string
+                      required:
+                      - port
+                      - switch
+                      type: object
+                  required:
+                  - mac
+                  - switchPort
+                  type: object
+                type: array
+              labels:
+                additionalProperties:
+                  type: string
+                description: Arbitrary labels for filtering and organization.
+                type: object
+              reservedFor:
+                description: Optional reservation - prevents booking unless by this entity.
+                nullable: true
+                type: string
+            required:
+            - bmc
+            - interfaces
+            type: object
+        required:
+        - spec
+        title: Machine
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: switches.neolaas.io
+spec:
+  group: neolaas.io
+  names:
+    categories: []
+    kind: Switch
+    plural: switches
+    shortNames: []
+    singular: switch
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.managementIp
+      name: Management IP
+      type: string
+    - jsonPath: .spec.backend
+      name: Backend
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for SwitchSpec via `CustomResource`
+        properties:
+          spec:
+            description: Switch represents a network switch in the lab.
+            properties:
+              backend:
+                default: nxos
+                description: Automation backend/driver.
+                enum:
+                - nxos
+                - iosxe
+                - ios
+                - eos
+                - junos
+                - ssh
+                type: string
+              credentialsSecret:
+                description: Reference to Secret with `username` and `password` keys.
+                type: string
+              labels:
+                additionalProperties:
+                  type: string
+                description: Arbitrary labels.
+                type: object
+              managementIp:
+                description: Management IP address.
+                type: string
+              port:
+                description: Port override (defaults based on backend).
+                format: uint16
+                minimum: 0.0
+                nullable: true
+                type: integer
+            required:
+            - credentialsSecret
+            - managementIp
+            type: object
+        required:
+        - spec
+        title: Switch
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: vlans.neolaas.io
+spec:
+  group: neolaas.io
+  names:
+    categories: []
+    kind: Vlan
+    plural: vlans
+    shortNames: []
+    singular: vlan
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.vlanId
+      name: VLAN ID
+      type: integer
+    - jsonPath: .spec.public
+      name: Public
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for VlanSpec via `CustomResource`
+        properties:
+          spec:
+            description: |-
+              Vlan represents an allocatable VLAN in the lab.
+
+              VLANs are a limited resource - there's a finite pool of publicly accessible VLANs that can be allocated to bookings.
+            properties:
+              adminState:
+                default: available
+                description: Administrative state.
+                enum:
+                - available
+                - reserved
+                - disabled
+                type: string
+              gateway:
+                description: Optional gateway for this VLAN (informational).
+                nullable: true
+                type: string
+              labels:
+                additionalProperties:
+                  type: string
+                description: Arbitrary labels.
+                type: object
+              public:
+                default: false
+                description: Whether this VLAN has public/external connectivity.
+                type: boolean
+              subnet:
+                description: Optional subnet for this VLAN (informational).
+                nullable: true
+                type: string
+              vlanId:
+                description: VLAN ID (1-4094).
+                format: uint16
+                minimum: 0.0
+                type: integer
+            required:
+            - vlanId
+            type: object
+        required:
+        - spec
+        title: Vlan
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+

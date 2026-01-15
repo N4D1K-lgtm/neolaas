@@ -1,3 +1,4 @@
 resources:
   - bookings.yaml
+  - inventory.yaml
 

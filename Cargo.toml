@@ -5,6 +5,7 @@ members = [
   "crates/neolaas-pxe",
   "crates/neolaas-cli",
   "crates/neolaas-api",
+  "crates/neolaas-operator",
 ]
 resolver = "2"
 

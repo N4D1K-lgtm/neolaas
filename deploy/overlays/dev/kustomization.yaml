@@ -1,3 +1,4 @@
 resources:
   - ../../base
   - ../../apps/neolaas
+  - ../../apps/neolaas-operator

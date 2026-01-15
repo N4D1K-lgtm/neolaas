@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neolaas-operator
+  namespace: infra
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: neolaas-operator
+rules:
+  # CRD access
+  - apiGroups: ["neolaas.io"]
+    resources: ["machines", "switches", "vlans"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["neolaas.io"]
+    resources: ["machines/status", "switches/status", "vlans/status"]
+    verbs: ["get", "update", "patch"]
+  # Finalizer management requires patch on the resources
+  - apiGroups: ["neolaas.io"]
+    resources: ["machines/finalizers", "switches/finalizers", "vlans/finalizers"]
+    verbs: ["update"]
+  # Events for debugging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # Secrets for credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: neolaas-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: neolaas-operator
+subjects:
+  - kind: ServiceAccount
+    name: neolaas-operator
+    namespace: infra
