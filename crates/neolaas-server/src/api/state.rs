@@ -2,12 +2,11 @@
 //!
 //! Shared state passed to all API handlers.
 
-use crate::actors::host_actor::HostActor;
 use crate::network::health::HealthActor;
+use crate::network::sharding::ShardingCoordinator;
 use etcd_client::Client;
 use kameo::prelude::*;
 use libp2p::PeerId;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -16,8 +15,8 @@ use tokio::sync::RwLock;
 pub struct AppState {
     pub etcd_client: Arc<RwLock<Client>>,
     pub node_id: String,
-    pub actors: Arc<RwLock<HashMap<String, ActorRef<HostActor>>>>,
     pub peer_id: Option<PeerId>,
     pub ping_actor: Option<ActorRef<HealthActor>>,
+    pub sharding_coordinator: Option<ActorRef<ShardingCoordinator>>,
     pub readiness: Arc<std::sync::atomic::AtomicBool>,
 }

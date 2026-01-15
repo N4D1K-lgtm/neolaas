@@ -5,11 +5,11 @@
 //! This module contains:
 //! - `state`: Shared application state
 //! - `health`: Liveness and readiness probes
-//! - `hosts`: Host actor management
 //! - `p2p`: P2P network statistics and broadcast
 
 mod health;
-mod hosts;
+// TODO: Re-enable once MachineActor is implemented in sharding module
+// mod hosts;
 mod p2p;
 mod state;
 
@@ -26,10 +26,10 @@ pub fn create_router(state: AppState) -> Router {
         // Health checks
         .route("/health", get(health::health_check))
         .route("/ready", get(health::readiness_check))
-        // Host management
-        .route("/hosts", post(hosts::create_host_actor))
-        .route("/hosts/{host_id}/provision", post(hosts::provision_host))
-        .route("/hosts/{host_id}/status", get(hosts::get_host_status))
+        // TODO: Re-enable host routes once MachineActor is implemented
+        // .route("/hosts", post(hosts::create_host_actor))
+        // .route("/hosts/{host_id}/provision", post(hosts::provision_host))
+        // .route("/hosts/{host_id}/status", get(hosts::get_host_status))
         // P2P endpoints
         .route("/p2p/stats", get(p2p::get_p2p_stats))
         .route("/p2p/broadcast", post(p2p::broadcast_message))
