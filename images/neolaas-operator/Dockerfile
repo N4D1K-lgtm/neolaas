@@ -33,7 +33,7 @@ FROM debian:trixie-slim AS runtime
 
 WORKDIR /app
 
-COPY --from=builder /app/target/release/neolaas-server /usr/local/bin/
+COPY --from=builder /app/target/release/neolaas-operator /usr/local/bin/
 
 ENTRYPOINT ["/usr/local/bin/neolaas-operator"]
 

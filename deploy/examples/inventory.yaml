@@ -61,12 +61,12 @@ metadata:
   namespace: infra
 spec:
   interfaces:
-    - mac: "00:de:11:r6:40:01"
+    - mac: "00:de:11:64:00:01"
       switchPort:
         switch: tor-a1
         port: "Ethernet1/1"
       pxe: true
-    - mac: "00:de:11:r6:40:02"
+    - mac: "00:de:11:64:00:02"
       switchPort:
         switch: tor-a1
         port: "Ethernet1/2"
@@ -88,12 +88,12 @@ metadata:
   namespace: infra
 spec:
   interfaces:
-    - mac: "00:de:11:r6:40:03"
+    - mac: "00:de:11:64:00:03"
       switchPort:
         switch: tor-a1
         port: "Ethernet1/3"
       pxe: true
-    - mac: "00:de:11:r6:40:04"
+    - mac: "00:de:11:64:00:04"
       switchPort:
         switch: tor-a1
         port: "Ethernet1/4"
@@ -115,7 +115,7 @@ metadata:
   namespace: infra
 spec:
   interfaces:
-    - mac: "00:hp:e3:80:g9:01"
+    - mac: "00:0e:38:09:e0:01"
       switchPort:
         switch: tor-a1
         port: "Ethernet1/5"
@@ -139,12 +139,12 @@ metadata:
   namespace: infra
 spec:
   interfaces:
-    - mac: "00:de:11:r6:40:05"
+    - mac: "00:de:11:64:00:05"
       switchPort:
         switch: tor-b1
         port: "Ethernet1/1"
       pxe: true
-    - mac: "00:de:11:r6:40:06"
+    - mac: "00:de:11:64:00:06"
       switchPort:
         switch: tor-b1
         port: "Ethernet1/2"
@@ -166,7 +166,7 @@ metadata:
   namespace: infra
 spec:
   interfaces:
-    - mac: "00:de:11:r6:40:07"
+    - mac: "00:de:11:64:00:07"
       switchPort:
         switch: tor-b1
         port: "Ethernet1/3"
@@ -190,7 +190,7 @@ metadata:
   namespace: infra
 spec:
   interfaces:
-    - mac: "00:sm:x1:1d:pg:01"
+    - mac: "00:5a:11:1d:e0:01"
       switchPort:
         switch: tor-b1
         port: "Ethernet1/5"

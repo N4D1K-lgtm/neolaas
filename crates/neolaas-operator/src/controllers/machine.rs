@@ -41,7 +41,7 @@ impl MachineController {
             .for_each(|res| async move {
                 match res {
                     Ok((obj, _)) => info!(name = %obj.name, "Reconciled Machine"),
-                    Err(e) => error!(error = %e, "Reconcile error"),
+                    Err(e) => error!(error = %e, error_debug = ?e, "Reconcile error"),
                 }
             })
             .await;
