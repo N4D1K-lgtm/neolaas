@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neolaas-operator
+  namespace: infra
+  labels:
+    app: neolaas-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neolaas-operator
+  template:
+    metadata:
+      labels:
+        app: neolaas-operator
+    spec:
+      serviceAccountName: neolaas-operator
+      containers:
+        - name: operator
+          image: neolaas-operator:dev
+          imagePullPolicy: IfNotPresent
+          args:
+            - run
+          env:
+            - name: ETCD_ENDPOINTS
+              value: "http://etcd.infra.svc.cluster.local:2379"
+            - name: RUST_LOG
+              value: "info,neolaas_operator=debug"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

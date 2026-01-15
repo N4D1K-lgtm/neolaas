@@ -7,6 +7,7 @@ CLUSTER_NAME = "infra-dev"
 NAMESPACE = "infra"
 IMAGE_NAME = "neolaas"
 IMAGE_TAG = "dev"
+OPERATOR_IMAGE = "neolaas-operator"
 KIND_CONTEXT = "kind-infra-dev"
 
 ###############################################################################
@@ -110,11 +111,50 @@ args = [
 dependencies = ["build-image"]
 
 ###############################################################################
+# Operator Build
+###############################################################################
+
+[tasks.build-operator]
+description = "Build neolaas-operator binary"
+command = "cargo"
+args = ["build", "-p", "neolaas-operator", "--release"]
+
+[tasks.build-operator-image]
+description = "Build neolaas-operator container image"
+command = "docker"
+args = [
+  "build",
+  "-t",
+  "${OPERATOR_IMAGE}:${IMAGE_TAG}",
+  "-f",
+  "images/neolaas-operator/Dockerfile",
+  ".",
+]
+
+[tasks.kind-load-operator]
+description = "Load operator image into kind cluster"
+command = "kind"
+args = [
+  "load",
+  "docker-image",
+  "${OPERATOR_IMAGE}:${IMAGE_TAG}",
+  "--name",
+  "${CLUSTER_NAME}",
+]
+dependencies = ["build-operator-image"]
+
+[tasks.generate-crds]
+description = "Generate CRD manifests from operator"
+script = '''
+cargo run -p neolaas-operator -- crds > deploy/base/crds/inventory.yaml
+'''
+
+###############################################################################
 # Deploy
 ###############################################################################
 
 [tasks.deploy-base]
-description = "Deploy base cluster resources (namespace, etcd)"
+description = "Deploy base cluster resources (namespace, etcd, CRDs)"
 command = "kubectl"
 args = ["apply", "-k", "deploy/overlays/dev"]
 
@@ -123,15 +163,34 @@ description = "Deploy neolaas application"
 command = "kubectl"
 args = ["rollout", "restart", "statefulset/neolaas", "-n", "${NAMESPACE}"]
 
+[tasks.deploy-operator]
+description = "Deploy neolaas-operator"
+script = '''
+kubectl set image -n ${NAMESPACE} deployment/neolaas-operator operator=${OPERATOR_IMAGE}:${IMAGE_TAG} || \
+kubectl apply -k deploy/apps/neolaas-operator
+'''
+dependencies = ["kind-load-operator"]
+
+[tasks.seed-inventory]
+description = "Seed test inventory (machines, switches, VLANs)"
+command = "kubectl"
+args = ["apply", "-f", "deploy/examples/inventory.yaml"]
+
 [tasks.deploy]
 description = "Deploy full stack into cluster"
 dependencies = [
   "kind-up",
   "install-cnpg",
   "kind-load-image",
+  "kind-load-operator",
   "deploy-base",
   "deploy-app",
+  "deploy-operator",
 ]
+
+[tasks.deploy-with-seed]
+description = "Deploy full stack and seed test data"
+dependencies = ["deploy", "seed-inventory"]
 
 ###############################################################################
 # Observe
@@ -141,6 +200,11 @@ dependencies = [
 description = "Tail neolaas logs"
 command = "kubectl"
 args = ["logs", "-n", "${NAMESPACE}", "-l", "app=neolaas", "-f", "--tail=100", "--prefix=true"]
+
+[tasks.logs-operator]
+description = "Tail neolaas-operator logs"
+command = "kubectl"
+args = ["logs", "-n", "${NAMESPACE}", "-l", "app=neolaas-operator", "-f", "--tail=100"]
 
 [tasks.logs-pod]
 description = "Tail specific pod logs (usage: cargo make logs-pod -- neolaas-0)"
@@ -216,6 +280,69 @@ args = [
   "--prefix",
   "${@}",
 ]
+
+###############################################################################
+# Inventory Management
+###############################################################################
+
+[tasks.get-machines]
+description = "List all machines"
+command = "kubectl"
+args = ["get", "machines", "-A", "-o", "wide"]
+
+[tasks.get-switches]
+description = "List all switches"
+command = "kubectl"
+args = ["get", "switches", "-A", "-o", "wide"]
+
+[tasks.get-vlans]
+description = "List all VLANs"
+command = "kubectl"
+args = ["get", "vlans", "-A", "-o", "wide"]
+
+[tasks.get-inventory]
+description = "List all inventory (machines, switches, VLANs)"
+script = '''
+echo "=== Machines ==="
+kubectl get machines -A -o wide
+echo ""
+echo "=== Switches ==="
+kubectl get switches -A -o wide
+echo ""
+echo "=== VLANs ==="
+kubectl get vlans -A -o wide
+'''
+
+[tasks.etcd-machines]
+description = "List machines synced to etcd"
+script = '''
+kubectl exec -n ${NAMESPACE} etcd-0 -- etcdctl get /neolaas/machines/ --prefix --keys-only
+'''
+
+[tasks.etcd-switches]
+description = "List switches synced to etcd"
+script = '''
+kubectl exec -n ${NAMESPACE} etcd-0 -- etcdctl get /neolaas/switches/ --prefix --keys-only
+'''
+
+[tasks.etcd-vlans]
+description = "List VLANs synced to etcd"
+script = '''
+kubectl exec -n ${NAMESPACE} etcd-0 -- etcdctl get /neolaas/vlans/ --prefix --keys-only
+'''
+
+[tasks.etcd-inventory]
+description = "Show all inventory data in etcd"
+script = '''
+echo "=== Machines in etcd ==="
+kubectl exec -n ${NAMESPACE} etcd-0 -- etcdctl get /neolaas/machines/ --prefix
+echo ""
+echo "=== Switches in etcd ==="
+kubectl exec -n ${NAMESPACE} etcd-0 -- etcdctl get /neolaas/switches/ --prefix
+echo ""
+echo "=== VLANs in etcd ==="
+kubectl exec -n ${NAMESPACE} etcd-0 -- etcdctl get /neolaas/vlans/ --prefix
+'''
 
 ###############################################################################
 # Testing API

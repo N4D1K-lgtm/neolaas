@@ -68,6 +68,7 @@ impl DiscoveryController {
         shutdown_rx: mpsc::UnboundedReceiver<()>,
         readiness: Arc<std::sync::atomic::AtomicBool>,
         config: NetworkConfig,
+        sharding_tx: Option<mpsc::UnboundedSender<Vec<PeerId>>>,
     ) -> Result<Self> {
         debug!(
             cluster_id = %cluster_id,
@@ -90,6 +91,7 @@ impl DiscoveryController {
             swarm_tx,
             readiness,
             config.clone(),
+            sharding_tx,
         );
 
         let (internal_shutdown_tx, internal_shutdown_rx) = mpsc::unbounded_channel();
@@ -217,6 +219,7 @@ pub async fn run_discovery_controller(
     shutdown_rx: mpsc::UnboundedReceiver<()>,
     readiness: Arc<std::sync::atomic::AtomicBool>,
     config: NetworkConfig,
+    sharding_tx: Option<mpsc::UnboundedSender<Vec<PeerId>>>,
 ) -> Result<()> {
     let controller = DiscoveryController::new(
         cluster_id,
@@ -227,6 +230,7 @@ pub async fn run_discovery_controller(
         shutdown_rx,
         readiness,
         config,
+        sharding_tx,
     )
     .await?;
 

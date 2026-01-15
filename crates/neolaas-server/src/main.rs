@@ -8,7 +8,6 @@
 
 use neolaas_server::api;
 use neolaas_server::network::create_etcd_client;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, level_filters::LevelFilter};
@@ -50,16 +49,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let etcd_client = Arc::new(RwLock::new(etcd_client));
     debug!("Connected to etcd");
 
-    let (peer_id, ping_actor, shutdown_tx, readiness) =
-        neolaas_server::network::init::initialize_p2p_network(node_id.clone()).await?;
+    let (peer_id, ping_actor, sharding_coordinator, shutdown_tx, readiness) =
+        neolaas_server::network::init::initialize_p2p_network(node_id.clone(), etcd_client.clone()).await?;
     info!(peer_id = %peer_id, "P2P network initialized");
 
     let state = api::AppState {
         etcd_client: etcd_client.clone(),
         node_id: node_id.clone(),
-        actors: Arc::new(RwLock::new(HashMap::new())),
         peer_id: Some(peer_id),
         ping_actor: Some(ping_actor),
+        sharding_coordinator: Some(sharding_coordinator),
         readiness,
     };
 

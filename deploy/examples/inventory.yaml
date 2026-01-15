@@ -1,0 +1,289 @@
+# Example inventory for testing neolaas-operator
+# This simulates a small lab with:
+# - 2 ToR switches (Cisco Nexus 9K running NXOS)
+# - 6 machines spread across both switches
+# - A pool of public VLANs for tenant isolation
+---
+# Secrets for switch credentials (in production, use sealed-secrets or external-secrets)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: switch-creds
+  namespace: infra
+type: Opaque
+stringData:
+  username: admin
+  password: changeme
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bmc-creds-default
+  namespace: infra
+type: Opaque
+stringData:
+  username: root
+  password: calvin
+---
+# ToR Switch 1 - Rack A
+apiVersion: neolaas.io/v1alpha1
+kind: Switch
+metadata:
+  name: tor-a1
+  namespace: infra
+spec:
+  managementIp: "10.0.1.1"
+  backend: nxos
+  credentialsSecret: switch-creds
+  labels:
+    rack: rack-a
+    role: tor
+---
+# ToR Switch 2 - Rack B
+apiVersion: neolaas.io/v1alpha1
+kind: Switch
+metadata:
+  name: tor-b1
+  namespace: infra
+spec:
+  managementIp: "10.0.2.1"
+  backend: nxos
+  credentialsSecret: switch-creds
+  labels:
+    rack: rack-b
+    role: tor
+---
+# Machine 1 - Dell R640 in Rack A
+apiVersion: neolaas.io/v1alpha1
+kind: Machine
+metadata:
+  name: dell-r640-001
+  namespace: infra
+spec:
+  interfaces:
+    - mac: "00:de:11:64:00:01"
+      switchPort:
+        switch: tor-a1
+        port: "Ethernet1/1"
+      pxe: true
+    - mac: "00:de:11:64:00:02"
+      switchPort:
+        switch: tor-a1
+        port: "Ethernet1/2"
+  bmc:
+    address: "10.1.1.101"
+    protocol: idrac
+    credentialsSecret: bmc-creds-default
+  cluster: production
+  labels:
+    vendor: dell
+    model: r640
+    rack: rack-a
+---
+# Machine 2 - Dell R640 in Rack A
+apiVersion: neolaas.io/v1alpha1
+kind: Machine
+metadata:
+  name: dell-r640-002
+  namespace: infra
+spec:
+  interfaces:
+    - mac: "00:de:11:64:00:03"
+      switchPort:
+        switch: tor-a1
+        port: "Ethernet1/3"
+      pxe: true
+    - mac: "00:de:11:64:00:04"
+      switchPort:
+        switch: tor-a1
+        port: "Ethernet1/4"
+  bmc:
+    address: "10.1.1.102"
+    protocol: idrac
+    credentialsSecret: bmc-creds-default
+  cluster: production
+  labels:
+    vendor: dell
+    model: r640
+    rack: rack-a
+---
+# Machine 3 - HPE DL380 Gen9 in Rack A (in-band IPMI)
+apiVersion: neolaas.io/v1alpha1
+kind: Machine
+metadata:
+  name: hpe-dl380-001
+  namespace: infra
+spec:
+  interfaces:
+    - mac: "00:0e:38:09:e0:01"
+      switchPort:
+        switch: tor-a1
+        port: "Ethernet1/5"
+      pxe: true
+  bmc:
+    address: "10.1.1.103"
+    protocol: ilo
+    credentialsSecret: bmc-creds-default
+    inBand: true
+  cluster: dev
+  labels:
+    vendor: hpe
+    model: dl380-gen9
+    rack: rack-a
+---
+# Machine 4 - Dell R640 in Rack B
+apiVersion: neolaas.io/v1alpha1
+kind: Machine
+metadata:
+  name: dell-r640-003
+  namespace: infra
+spec:
+  interfaces:
+    - mac: "00:de:11:64:00:05"
+      switchPort:
+        switch: tor-b1
+        port: "Ethernet1/1"
+      pxe: true
+    - mac: "00:de:11:64:00:06"
+      switchPort:
+        switch: tor-b1
+        port: "Ethernet1/2"
+  bmc:
+    address: "10.1.2.101"
+    protocol: idrac
+    credentialsSecret: bmc-creds-default
+  cluster: production
+  labels:
+    vendor: dell
+    model: r640
+    rack: rack-b
+---
+# Machine 5 - Dell R640 in Rack B (maintenance)
+apiVersion: neolaas.io/v1alpha1
+kind: Machine
+metadata:
+  name: dell-r640-004
+  namespace: infra
+spec:
+  interfaces:
+    - mac: "00:de:11:64:00:07"
+      switchPort:
+        switch: tor-b1
+        port: "Ethernet1/3"
+      pxe: true
+  bmc:
+    address: "10.1.2.102"
+    protocol: idrac
+    credentialsSecret: bmc-creds-default
+  adminState: maintenance
+  cluster: production
+  labels:
+    vendor: dell
+    model: r640
+    rack: rack-b
+---
+# Machine 6 - Supermicro in Rack B (reserved for CI)
+apiVersion: neolaas.io/v1alpha1
+kind: Machine
+metadata:
+  name: sm-x11-001
+  namespace: infra
+spec:
+  interfaces:
+    - mac: "00:5a:11:1d:e0:01"
+      switchPort:
+        switch: tor-b1
+        port: "Ethernet1/5"
+      pxe: true
+  bmc:
+    address: "10.1.2.103"
+    protocol: ipmi
+    credentialsSecret: bmc-creds-default
+  adminState: reserved
+  reservedFor: ci-system
+  cluster: dev
+  labels:
+    vendor: supermicro
+    model: x11dpg
+    rack: rack-b
+---
+# Public VLANs for tenant isolation
+apiVersion: neolaas.io/v1alpha1
+kind: Vlan
+metadata:
+  name: public-100
+  namespace: infra
+spec:
+  vlanId: 100
+  public: true
+  subnet: "192.168.100.0/24"
+  gateway: "192.168.100.1"
+  labels:
+    pool: public
+---
+apiVersion: neolaas.io/v1alpha1
+kind: Vlan
+metadata:
+  name: public-101
+  namespace: infra
+spec:
+  vlanId: 101
+  public: true
+  subnet: "192.168.101.0/24"
+  gateway: "192.168.101.1"
+  labels:
+    pool: public
+---
+apiVersion: neolaas.io/v1alpha1
+kind: Vlan
+metadata:
+  name: public-102
+  namespace: infra
+spec:
+  vlanId: 102
+  public: true
+  subnet: "192.168.102.0/24"
+  gateway: "192.168.102.1"
+  labels:
+    pool: public
+---
+apiVersion: neolaas.io/v1alpha1
+kind: Vlan
+metadata:
+  name: public-103
+  namespace: infra
+spec:
+  vlanId: 103
+  public: true
+  subnet: "192.168.103.0/24"
+  gateway: "192.168.103.1"
+  labels:
+    pool: public
+---
+apiVersion: neolaas.io/v1alpha1
+kind: Vlan
+metadata:
+  name: public-104
+  namespace: infra
+spec:
+  vlanId: 104
+  public: true
+  subnet: "192.168.104.0/24"
+  gateway: "192.168.104.1"
+  labels:
+    pool: public
+---
+# Internal/management VLAN (not allocatable)
+apiVersion: neolaas.io/v1alpha1
+kind: Vlan
+metadata:
+  name: mgmt-10
+  namespace: infra
+spec:
+  vlanId: 10
+  public: false
+  subnet: "10.0.10.0/24"
+  gateway: "10.0.10.1"
+  adminState: reserved
+  labels:
+    pool: management

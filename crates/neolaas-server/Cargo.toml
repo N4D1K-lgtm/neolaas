@@ -29,8 +29,6 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 backoff = { workspace = true }
 
-neolaas-core = { workspace = true }
-
 etcd-client = { workspace = true }
 tonic = { workspace = true }
 hickory-resolver = { workspace = true }

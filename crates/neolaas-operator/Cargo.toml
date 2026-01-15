@@ -1,0 +1,40 @@
+[package]
+name = "neolaas-operator"
+version.workspace = true
+edition.workspace = true
+description = "Kubernetes operator for neolaas hardware inventory (Machine and Switch CRDs)"
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "neolaas-operator"
+path = "src/main.rs"
+
+[dependencies]
+# Kubernetes
+kube = { version = "0.98", features = ["runtime", "derive", "rustls-tls"] }
+k8s-openapi = { version = "0.24", features = ["v1_32"] }
+schemars = "0.8"
+rustls = { version = "0.23", features = ["ring"] }
+
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+etcd-client = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+
+# Controller utilities
+futures = { workspace = true }
+clap = { workspace = true }
+
+# Strict types
+macaddr = { version = "1.0", features = ["serde"] }
+strum = { version = "0.26", features = ["derive"] }
+
+# Serialization
+serde_yaml = "0.9"
