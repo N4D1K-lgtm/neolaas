@@ -1,10 +1,8 @@
 [workspace]
 members = [
-  "crates/neolaas-core",
   "crates/neolaas-server",
   "crates/neolaas-pxe",
   "crates/neolaas-cli",
-  "crates/neolaas-api",
   "crates/neolaas-operator",
 ]
 resolver = "2"
@@ -45,15 +43,15 @@ sqlx = { version = "0.8.6", features = [
 
 # networking
 libp2p = { version = "0.56.0", features = [
-    "serde",
-    "tcp",
-    "quic",
-    "noise",
-    "yamux",
-    "tokio",
-    "mdns",
-    "kad",
-    "identify",
+  "serde",
+  "tcp",
+  "quic",
+  "noise",
+  "yamux",
+  "tokio",
+  "mdns",
+  "kad",
+  "identify",
 ] }
 etcd-client = { version = "0.17", features = ["raw-channel"] }
 tonic = "0.14"
@@ -67,9 +65,6 @@ clap = { version = "4.5", features = ["derive", "env"] }
 uuid = { version = "1.0", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 backoff = { version = "0.4", features = ["tokio"] }
-
-neolaas-core = { path = "crates/neolaas-core" }
-neolaas-api = { path = "crates/neolaas-api" }
 
 [profile.release]
 opt-level = 3
