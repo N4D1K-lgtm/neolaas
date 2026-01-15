@@ -21,7 +21,6 @@ pub struct HostActor {
     pub host_id: String,
     pub allocation: HostAllocation,
     etcd_client: Arc<RwLock<Client>>,
-    #[allow(dead_code)]
     node_id: String,
 }
 

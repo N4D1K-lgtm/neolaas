@@ -1,104 +1,38 @@
-//! HTTP API Handlers
+//! Host Management Endpoints
 //!
-//! REST API endpoints for host management, health checks, and P2P statistics.
+//! REST API handlers for host actor creation, provisioning, and status.
 
+use super::state::AppState;
 use crate::actors::host_actor::{GetHostStatus, HostActor, HostStatus, ProvisionHost};
-use crate::api_p2p::{broadcast_message, get_p2p_stats};
 use crate::models::{HostAllocation, ProvisionState};
-use crate::network::test_actor::PingActor;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::Json,
-    routing::{get, post},
-    Router,
 };
-use etcd_client::Client;
 use kameo::prelude::*;
-use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use uuid::Uuid;
-
-/// Shared application state
-#[derive(Clone)]
-pub struct AppState {
-    pub etcd_client: Arc<RwLock<Client>>,
-    pub node_id: String,
-    pub actors: Arc<RwLock<HashMap<String, ActorRef<HostActor>>>>,
-    pub peer_id: Option<PeerId>,
-    pub ping_actor: Option<ActorRef<PingActor>>,
-    pub readiness: Arc<std::sync::atomic::AtomicBool>,
-}
-
-/// Create API router
-pub fn create_router(state: AppState) -> Router {
-    Router::new()
-        .route("/health", get(health_check))
-        .route("/ready", get(readiness_check))
-        .route("/hosts", post(create_host_actor))
-        .route("/hosts/{host_id}/provision", post(provision_host))
-        .route("/hosts/{host_id}/status", get(get_host_status))
-        .route("/p2p/stats", get(get_p2p_stats))
-        .route("/p2p/broadcast", post(broadcast_message))
-        .with_state(state)
-}
-
-/// Liveness probe endpoint. Verifies etcd connection is healthy.
-async fn health_check(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
-    let etcd_check = tokio::time::timeout(
-        tokio::time::Duration::from_secs(2),
-        async {
-            let mut client = state.etcd_client.write().await;
-            client.status().await
-        }
-    ).await;
-
-    match etcd_check {
-        Ok(Ok(_)) => Ok("OK"),
-        Ok(Err(e)) => {
-            tracing::warn!(error = %e, "etcd health check failed");
-            Err(StatusCode::SERVICE_UNAVAILABLE)
-        }
-        Err(_) => {
-            tracing::warn!("etcd health check timed out");
-            Err(StatusCode::REQUEST_TIMEOUT)
-        }
-    }
-}
-
-/// Readiness probe endpoint. Returns OK after discovery convergence completes.
-async fn readiness_check(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
-    if state
-        .readiness
-        .load(std::sync::atomic::Ordering::Acquire)
-    {
-        Ok("READY")
-    } else {
-        Err(StatusCode::SERVICE_UNAVAILABLE)
-    }
-}
 
 /// Request to create a new host actor
 #[derive(Debug, Deserialize)]
-struct CreateHostRequest {
-    host_id: String,
-    booking_id: Uuid,
-    owner: String,
-    duration_hours: u32,
+pub struct CreateHostRequest {
+    pub host_id: String,
+    pub booking_id: Uuid,
+    pub owner: String,
+    pub duration_hours: u32,
 }
 
 /// Response for host creation
 #[derive(Debug, Serialize)]
-struct CreateHostResponse {
-    host_id: String,
-    allocation_id: Uuid,
-    message: String,
+pub struct CreateHostResponse {
+    pub host_id: String,
+    pub allocation_id: Uuid,
+    pub message: String,
 }
 
-async fn create_host_actor(
+/// Create a new host actor
+pub async fn create_host_actor(
     State(state): State<AppState>,
     Json(req): Json<CreateHostRequest>,
 ) -> Result<Json<CreateHostResponse>, (StatusCode, String)> {
@@ -178,12 +112,13 @@ async fn create_host_actor(
 
 /// Request to provision a host
 #[derive(Debug, Deserialize)]
-struct ProvisionRequest {
-    image: String,
-    config: Option<serde_json::Value>,
+pub struct ProvisionRequest {
+    pub image: String,
+    pub config: Option<serde_json::Value>,
 }
 
-async fn provision_host(
+/// Provision a host with an image
+pub async fn provision_host(
     State(state): State<AppState>,
     Path(host_id): Path<String>,
     Json(req): Json<ProvisionRequest>,
@@ -221,7 +156,8 @@ async fn provision_host(
     })))
 }
 
-async fn get_host_status(
+/// Get the status of a host
+pub async fn get_host_status(
     State(state): State<AppState>,
     Path(host_id): Path<String>,
 ) -> Result<Json<HostStatus>, (StatusCode, String)> {

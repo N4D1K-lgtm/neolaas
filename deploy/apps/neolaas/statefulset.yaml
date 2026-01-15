@@ -5,13 +5,12 @@ metadata:
   namespace: infra
 spec:
   serviceName: neolaas-headless
-  replicas: 3  # Scale to 3 for P2P testing
+  replicas: 3
   podManagementPolicy: Parallel
-  # Rolling update strategy for zero-downtime deployments
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 1  # Update one pod at a time
+      maxUnavailable: 1  
   selector:
     matchLabels:
       app: neolaas
@@ -20,42 +19,34 @@ spec:
       labels:
         app: neolaas
     spec:
-      # Allow time for graceful shutdown (preStop hook + propagation)
       terminationGracePeriodSeconds: 30
       containers:
         - name: neolaas
           image: neolaas:dev
           imagePullPolicy: IfNotPresent
           env:
-            # Logging configuration
             - name: RUST_LOG
               value: "info,neolaas_server=debug,neolaas::p2p=info,kameo=debug"
             - name: RUST_BACKTRACE
               value: "1"
 
-            # API configuration
             - name: BIND_ADDR
               value: "0.0.0.0:8080"
 
-            # Etcd configuration
             - name: ETCD_ENDPOINTS
               value: "http://etcd.infra.svc.cluster.local:2379"
 
-            # Cluster ID for etcd namespace isolation
             - name: CLUSTER_ID
               value: "neolaas-default"
 
-            # Node identification for actor system
             - name: NODE_ID
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
 
-            # P2P network configuration
             - name: P2P_PORT
               value: "9000"
 
-            # Kubernetes DNS-based peer discovery
             - name: NAMESPACE
               valueFrom:
                 fieldRef:
@@ -67,7 +58,6 @@ spec:
                 fieldRef:
                   fieldPath: status.podIP
 
-            # Database (optional for now)
             - name: DATABASE_URL
               value: postgresql://neolaas:neolaas-dev-password@neolaas-db-rw.infra.svc.cluster.local:5432/neolaas
 
@@ -79,21 +69,14 @@ spec:
               name: p2p
               protocol: TCP
 
-          # Lifecycle hooks for graceful shutdown
           lifecycle:
             preStop:
               exec:
-                # The application handles graceful shutdown internally:
-                # 1. On SIGTERM, DiscoveryController revokes etcd lease
-                # 2. Waits 5 seconds for DELETE event propagation
-                # 3. Shuts down actor system and exits
-                # This sleep ensures the application has time to start the shutdown process
                 command:
                   - /bin/sh
                   - -c
                   - |
                     echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] preStop: Starting graceful shutdown"
-                    # Give app a moment to receive and process the shutdown signal
                     sleep 1
                     echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] preStop: Ready for SIGTERM"
 
@@ -105,8 +88,6 @@ spec:
               memory: "512Mi"
               cpu: "1000m"
 
-          # Liveness probe: Check if actor swarm and etcd connection are active
-          # If etcd connection is lost for > 1 minute, pod should be restarted
           livenessProbe:
             httpGet:
               path: /health
@@ -114,10 +95,8 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 15
             timeoutSeconds: 5
-            failureThreshold: 4  # 4 failures * 15s = 60s grace period
+            failureThreshold: 4  
 
-          # Readiness probe: Pod is ready only after DiscoveryController completes
-          # initial sync (Convergence phase) and routing table is populated
           readinessProbe:
             httpGet:
               path: /ready

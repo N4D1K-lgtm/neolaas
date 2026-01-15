@@ -6,8 +6,8 @@
 //! - P2P network for peer discovery and actor messaging
 //! - HTTP API server for client requests
 
-use etcd_client::Client;
 use neolaas_server::api;
+use neolaas_server::network::create_etcd_client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     debug!(etcd_endpoints = ?etcd_endpoints, "etcd endpoints");
 
-    let etcd_client = Client::connect(&etcd_endpoints, None).await?;
+    let etcd_client = create_etcd_client(&etcd_endpoints).await?;
     let etcd_client = Arc::new(RwLock::new(etcd_client));
     debug!("Connected to etcd");
 
