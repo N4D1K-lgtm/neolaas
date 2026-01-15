@@ -6,16 +6,16 @@
 //! 3. Convergence - Fetch all peers and inject into Kademlia
 //! 4. Maintenance - Watch for peer changes
 
+use super::super::config::NetworkConfig;
 use super::etcd::{EtcdOperations, PeerMetadata};
 use super::DiscoveryCommand;
-use super::super::config::NetworkConfig;
 use anyhow::{anyhow, Result};
 use etcd_client::{
     EventType, GetOptions, LeaseKeepAliveStream, LeaseKeeper, PutOptions, WatchOptions,
     WatchStream,
 };
 use libp2p::{Multiaddr, PeerId};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
@@ -28,6 +28,10 @@ pub struct DiscoveryPhases {
     pub swarm_tx: mpsc::UnboundedSender<DiscoveryCommand>,
     pub readiness: Arc<std::sync::atomic::AtomicBool>,
     pub config: NetworkConfig,
+    /// Known peers (maintained for sharding updates)
+    known_peers: HashSet<PeerId>,
+    /// Channel to notify ShardingCoordinator of topology changes
+    sharding_tx: Option<mpsc::UnboundedSender<Vec<PeerId>>>,
 }
 
 impl DiscoveryPhases {
@@ -38,7 +42,12 @@ impl DiscoveryPhases {
         swarm_tx: mpsc::UnboundedSender<DiscoveryCommand>,
         readiness: Arc<std::sync::atomic::AtomicBool>,
         config: NetworkConfig,
+        sharding_tx: Option<mpsc::UnboundedSender<Vec<PeerId>>>,
     ) -> Self {
+        // Start with local peer in the known set
+        let mut known_peers = HashSet::new();
+        known_peers.insert(local_peer_id);
+
         Self {
             etcd_ops,
             local_peer_id,
@@ -46,6 +55,19 @@ impl DiscoveryPhases {
             swarm_tx,
             readiness,
             config,
+            known_peers,
+            sharding_tx,
+        }
+    }
+
+    /// Notify the ShardingCoordinator of topology changes
+    fn notify_sharding(&self) {
+        if let Some(tx) = &self.sharding_tx {
+            let peers: Vec<PeerId> = self.known_peers.iter().copied().collect();
+            debug!(peer_count = peers.len(), "Notifying ShardingCoordinator of topology change");
+            if tx.send(peers).is_err() {
+                warn!("Failed to send topology update to ShardingCoordinator");
+            }
         }
     }
 
@@ -144,6 +166,7 @@ impl DiscoveryPhases {
                                         {
                                             error!(error = %e, "Failed to send AddPeer command");
                                         }
+                                        self.known_peers.insert(peer_id);
                                         peer_count += 1;
                                     }
                                     Err(e) => {
@@ -164,6 +187,9 @@ impl DiscoveryPhases {
         }
 
         info!(peer_count = peer_count, "Convergence complete");
+
+        // Notify ShardingCoordinator of initial topology
+        self.notify_sharding();
 
         self.readiness
             .store(true, std::sync::atomic::Ordering::Release);
@@ -225,6 +251,10 @@ impl DiscoveryPhases {
                                             );
                                             let _ =
                                                 swarm_tx.send(DiscoveryCommand::AddPeer { peer_id, addr });
+
+                                            // Track peer and notify sharding
+                                            self.known_peers.insert(peer_id);
+                                            self.notify_sharding();
                                         }
                                     }
                                 }
@@ -242,6 +272,10 @@ impl DiscoveryPhases {
                                         "Watch: peer departed"
                                     );
                                     let _ = swarm_tx.send(DiscoveryCommand::RemovePeer { peer_id });
+
+                                    // Remove peer and notify sharding
+                                    self.known_peers.remove(&peer_id);
+                                    self.notify_sharding();
                                 }
                             }
                         }
