@@ -1,12 +1,12 @@
 //! Sharding Coordinator Module
 //!
-//! Implements Maglev consistent hashing for distributing MachineActors
+//! Implements Rendezvous consistent hashing for distributing MachineActors
 //! across cluster nodes with minimal disruption during topology changes.
 //!
 //! ## Architecture
 //!
 //! The ShardingCoordinator receives topology updates from the DiscoveryController
-//! and maintains a Maglev hash table that maps machine IDs to owner nodes.
+//! and maintains a hash table that maps machine IDs to owner nodes.
 //!
 //! ```text
 //! etcd watch event (PUT/DELETE)
@@ -19,7 +19,7 @@
 //!    ↓       ↓
 //! Kademlia   ShardingCoordinator
 //!            ↓
-//!            MaglevHasher.rebuild()
+//!            RendezvousHasher.rebuild()
 //! ```
 //!
 //! ## Usage
@@ -35,9 +35,9 @@
 //! ```
 
 mod actor;
-mod maglev;
 mod messages;
+mod rendezvous;
 
 pub use actor::ShardingCoordinator;
-pub use maglev::MaglevHasher;
 pub use messages::{GetShardStats, LookupMachine, LookupResult, ShardStats, TopologyAck, TopologyChanged};
+pub use rendezvous::RendezvousHasher;

@@ -52,6 +52,8 @@ pub struct DiscoveryController {
     internal_shutdown_tx: mpsc::UnboundedSender<()>,
     /// Channel for receiving internal shutdown signals (None after extracted in run())
     internal_shutdown_rx: Option<mpsc::UnboundedReceiver<()>>,
+    /// Channel to signal convergence complete (for machine sync)
+    convergence_tx: Option<tokio::sync::oneshot::Sender<()>>,
     /// Current state
     state: DiscoveryState,
     /// Configuration
@@ -69,6 +71,7 @@ impl DiscoveryController {
         readiness: Arc<std::sync::atomic::AtomicBool>,
         config: NetworkConfig,
         sharding_tx: Option<mpsc::UnboundedSender<Vec<PeerId>>>,
+        convergence_tx: Option<tokio::sync::oneshot::Sender<()>>,
     ) -> Result<Self> {
         debug!(
             cluster_id = %cluster_id,
@@ -102,6 +105,7 @@ impl DiscoveryController {
             shutdown_rx: Some(shutdown_rx),
             internal_shutdown_tx,
             internal_shutdown_rx: Some(internal_shutdown_rx),
+            convergence_tx,
             state: DiscoveryState::Initialization,
             config,
         })
@@ -159,6 +163,12 @@ impl DiscoveryController {
         // Phase 3: Converge
         self.state = DiscoveryState::Convergence;
         self.phases.converge().await?;
+
+        // Signal convergence complete (allows machine sync to proceed with correct topology)
+        if let Some(tx) = self.convergence_tx.take() {
+            let _ = tx.send(());
+            debug!("Convergence signal sent to machine manager");
+        }
 
         // Phase 4: Enter Maintenance
         self.state = DiscoveryState::Maintenance;
@@ -220,6 +230,7 @@ pub async fn run_discovery_controller(
     readiness: Arc<std::sync::atomic::AtomicBool>,
     config: NetworkConfig,
     sharding_tx: Option<mpsc::UnboundedSender<Vec<PeerId>>>,
+    convergence_tx: Option<tokio::sync::oneshot::Sender<()>>,
 ) -> Result<()> {
     let controller = DiscoveryController::new(
         cluster_id,
@@ -231,6 +242,7 @@ pub async fn run_discovery_controller(
         readiness,
         config,
         sharding_tx,
+        convergence_tx,
     )
     .await?;
 

@@ -9,6 +9,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub struct GetMachineStatus;
 
+/// Get all machine statuses from the manager.
+#[derive(Debug, Clone)]
+pub struct GetAllMachineStatuses;
+
 /// Machine status response.
 #[derive(Debug, Clone, Serialize, Deserialize, Reply)]
 pub struct MachineStatus {
@@ -20,6 +24,12 @@ pub struct MachineStatus {
     pub admin_state: String,
     /// Cluster this machine belongs to
     pub cluster: String,
+    /// Current booking ID if machine is booked
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_booking: Option<String>,
+    /// Last activity timestamp (Unix seconds)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_activity: Option<i64>,
 }
 
 /// Operational state of a machine actor.
@@ -127,4 +137,18 @@ pub struct CheckOwnership {
 pub struct OwnershipCheckResult {
     /// Should this actor shut down?
     pub should_shutdown: bool,
+}
+
+/// Message to trigger initial machine sync.
+/// Sent after discovery convergence completes (correct topology available).
+#[derive(Debug, Clone)]
+pub struct SyncAllMachines;
+
+/// Result of initial sync.
+#[derive(Debug, Clone, Reply)]
+pub struct SyncResult {
+    /// Number of machines synced
+    pub total_machines: usize,
+    /// Number of actors spawned locally
+    pub local_actors: usize,
 }

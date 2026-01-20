@@ -29,8 +29,8 @@ pub use config::NetworkConfig;
 pub use discovery::{create_etcd_client, DiscoveryCommand, DiscoveryController, DiscoveryState};
 pub use health::{HealthActor, PingMessage};
 pub use machines::{
-    spawn_machine_actor_manager, MachineActor, MachineActorManager, MachineSpec, MachineState,
-    MachineStatus,
+    spawn_machine_actor_manager_actor, GetAllMachineStatuses, MachineActor,
+    MachineActorManagerActor, MachineSpec, MachineState, MachineStatus,
 };
-pub use sharding::{LookupMachine, LookupResult, MaglevHasher, ShardingCoordinator, TopologyChanged};
+pub use sharding::{LookupMachine, LookupResult, RendezvousHasher, ShardingCoordinator, TopologyChanged};
 pub use types::{ConnectionStatus, NetworkState, PeerConnectionState, PeerInfo};

@@ -5,3 +5,4 @@
 pub mod api;
 pub mod models;
 pub mod network;
+pub mod observability;

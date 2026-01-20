@@ -204,7 +204,7 @@ impl DiscoveryPhases {
 
         let prefix = self.etcd_ops.peers_prefix();
         let watch_options = WatchOptions::new().with_prefix();
-        let (_watcher, stream) = self
+        let stream = self
             .etcd_ops
             .client
             .watch(prefix, Some(watch_options))

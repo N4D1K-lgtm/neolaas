@@ -1,8 +1,8 @@
 //! ShardingCoordinator Actor
 //!
-//! Manages the Maglev hash ring and determines machine-to-node ownership.
+//! Manages consistent hashing and determines machine-to-node ownership.
 
-use super::maglev::MaglevHasher;
+use super::rendezvous::RendezvousHasher;
 use super::messages::{GetShardStats, LookupMachine, LookupResult, ShardStats, TopologyAck, TopologyChanged};
 use kameo::{
     message::{Context, Message},
@@ -13,14 +13,14 @@ use tracing::{debug, info};
 
 /// Coordinates machine actor sharding across cluster nodes.
 ///
-/// Uses Maglev consistent hashing to map machine IDs to owner nodes
+/// Uses Rendezvous consistent hashing to map machine IDs to owner nodes
 /// with minimal disruption during topology changes.
 #[derive(Actor)]
 pub struct ShardingCoordinator {
     /// Local peer ID
     local_peer_id: PeerId,
-    /// Maglev hash table
-    hasher: MaglevHasher,
+    /// Rendezvous hasher
+    hasher: RendezvousHasher,
 }
 
 impl ShardingCoordinator {
@@ -36,7 +36,7 @@ impl ShardingCoordinator {
 
         Self {
             local_peer_id,
-            hasher: MaglevHasher::new(initial_peers),
+            hasher: RendezvousHasher::new(initial_peers),
         }
     }
 
@@ -91,7 +91,7 @@ impl Message<TopologyChanged> for ShardingCoordinator {
         info!(
             previous = previous_count,
             new = new_count,
-            "Topology change: rebuilding Maglev table"
+            "Topology change: rebuilding hash table"
         );
 
         self.hasher.rebuild(msg.peers);

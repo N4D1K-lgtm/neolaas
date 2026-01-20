@@ -8,12 +8,12 @@
 //! - Command processing from [`DiscoveryController`]
 //! - Periodic ping loop for peer health monitoring
 //! - ShardingCoordinator for machine actor distribution
-//! - MachineActorManager for distributed machine lifecycle management
+//! - MachineActorManagerActor for distributed machine lifecycle management
 
 use super::{
     discovery::DiscoveryCommand,
     health::HealthActor,
-    machines::spawn_machine_actor_manager,
+    machines::{spawn_machine_actor_manager_actor, MachineActorManagerActor},
     sharding::{ShardingCoordinator, TopologyChanged},
     NetworkState,
 };
@@ -30,7 +30,7 @@ use tracing::{debug, error, info, warn};
 /// - node_id: Unique identifier for this node
 /// - etcd_client: Shared etcd client for MachineActorManager
 ///
-/// Returns: (PeerId, HealthActor ActorRef, ShardingCoordinator ActorRef, Shutdown sender, Readiness state)
+/// Returns: (PeerId, HealthActor ActorRef, ShardingCoordinator ActorRef, MachineActorManagerActor ActorRef, Shutdown sender, Readiness state)
 pub async fn initialize_p2p_network(
     node_id: String,
     etcd_client: Arc<RwLock<Client>>,
@@ -39,6 +39,7 @@ pub async fn initialize_p2p_network(
         PeerId,
         ActorRef<HealthActor>,
         ActorRef<ShardingCoordinator>,
+        ActorRef<MachineActorManagerActor>,
         mpsc::UnboundedSender<()>,
         Arc<std::sync::atomic::AtomicBool>,
     ),
@@ -86,15 +87,26 @@ pub async fn initialize_p2p_network(
         "ShardingCoordinator spawned"
     );
 
-    // Spawn MachineActorManager with sharding coordinator
-    let machine_topology_tx = spawn_machine_actor_manager(
+    // Create channel for topology updates to MachineActorManager
+    let (machine_topology_tx, machine_topology_rx) = mpsc::unbounded_channel();
+
+    // Create channel to signal when discovery convergence completes
+    let (convergence_tx, convergence_rx) = tokio::sync::oneshot::channel();
+
+    // Spawn MachineActorManagerActor with sharding coordinator
+    // Note: Initial sync is deferred until convergence completes (correct topology)
+    let machine_manager_ref = spawn_machine_actor_manager_actor(
         local_peer_id,
+        node_id.clone(),
         sharding_ref.clone(),
         etcd_client,
-    );
-    debug!("MachineActorManager spawned");
+        machine_topology_rx,
+        convergence_rx,
+    )
+    .await?;
+    debug!("MachineActorManagerActor spawned");
 
-    // Bridge the sharding channel to the actor and notify MachineActorManager
+    // Bridge the sharding channel to the actors
     let sharding_ref_for_bridge = sharding_ref.clone();
     tokio::spawn(async move {
         while let Some(peers) = sharding_rx.recv().await {
@@ -107,9 +119,9 @@ pub async fn initialize_p2p_network(
                 warn!(error = %e, "Failed to send topology update to ShardingCoordinator");
             }
 
-            // Notify MachineActorManager to rebalance
+            // Notify MachineActorManagerActor to rebalance
             if machine_topology_tx.send(()).is_err() {
-                warn!("Failed to notify MachineActorManager of topology change");
+                warn!("Failed to notify MachineActorManagerActor of topology change");
             }
         }
         debug!("Sharding channel bridge closed");
@@ -132,6 +144,7 @@ pub async fn initialize_p2p_network(
             readiness_for_controller,
             config_for_discovery,
             Some(sharding_tx),
+            Some(convergence_tx),
         )
         .await
         {
@@ -157,5 +170,12 @@ pub async fn initialize_p2p_network(
     // Spawn periodic ping loop using the health module
     super::health::spawn_ping_loop(local_peer_id, node_id, network_state, config);
 
-    Ok((local_peer_id, actor_ref, sharding_ref, shutdown_tx, readiness))
+    Ok((
+        local_peer_id,
+        actor_ref,
+        sharding_ref,
+        machine_manager_ref,
+        shutdown_tx,
+        readiness,
+    ))
 }

@@ -8,11 +8,13 @@ use super::messages::{
     MachineStatus, OwnershipCheckResult, ProvisionMachine, ProvisionResult, UpdateAck,
     UpdateMachineSpec,
 };
+use crate::observability::events;
 use kameo::{
     message::{Context, Message},
     Actor,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicI64, Ordering};
 use tracing::{debug, info, warn};
 
 /// Simplified machine spec for actor use.
@@ -43,13 +45,29 @@ pub struct MachineActor {
     spec: MachineSpec,
     /// Current operational state
     state: MachineState,
+    /// Previous state (for event emission)
+    previous_state: MachineState,
     /// Active booking ID if machine is booked
     current_booking: Option<String>,
+    /// Last activity timestamp (Unix seconds)
+    last_activity: AtomicI64,
+    /// Node ID for event context
+    #[allow(dead_code)]
+    node_id: String,
 }
 
 impl MachineActor {
     /// Create a new MachineActor for the given machine.
     pub fn new(machine_id: String, spec_json: &str) -> Result<Self, serde_json::Error> {
+        Self::with_node_id(machine_id, spec_json, "unknown".to_string())
+    }
+
+    /// Create a new MachineActor with node ID for event context.
+    pub fn with_node_id(
+        machine_id: String,
+        spec_json: &str,
+        node_id: String,
+    ) -> Result<Self, serde_json::Error> {
         let spec: MachineSpec = serde_json::from_str(spec_json)?;
 
         info!(
@@ -63,12 +81,20 @@ impl MachineActor {
             machine_id,
             spec,
             state: MachineState::Initializing,
+            previous_state: MachineState::Initializing,
             current_booking: None,
+            last_activity: AtomicI64::new(chrono::Utc::now().timestamp()),
+            node_id,
         })
     }
 
     /// Create with an already-parsed spec.
     pub fn with_spec(machine_id: String, spec: MachineSpec) -> Self {
+        Self::with_spec_and_node_id(machine_id, spec, "unknown".to_string())
+    }
+
+    /// Create with an already-parsed spec and node ID.
+    pub fn with_spec_and_node_id(machine_id: String, spec: MachineSpec, node_id: String) -> Self {
         info!(
             machine_id = %machine_id,
             admin_state = %spec.admin_state,
@@ -80,7 +106,10 @@ impl MachineActor {
             machine_id,
             spec,
             state: MachineState::Initializing,
+            previous_state: MachineState::Initializing,
             current_booking: None,
+            last_activity: AtomicI64::new(chrono::Utc::now().timestamp()),
+            node_id,
         }
     }
 
@@ -92,9 +121,32 @@ impl MachineActor {
     /// Transition to idle state after initialization.
     fn initialize(&mut self) {
         if self.state == MachineState::Initializing {
-            self.state = MachineState::Idle;
+            self.transition_to(MachineState::Idle);
             debug!(machine_id = %self.machine_id, "Machine initialized to idle state");
         }
+    }
+
+    /// Transition to a new state, emitting events and updating metrics.
+    fn transition_to(&mut self, new_state: MachineState) {
+        if self.state != new_state {
+            self.previous_state = self.state;
+            self.state = new_state;
+            self.update_activity();
+
+            events::machine_state_changed(
+                &self.machine_id,
+                &self.previous_state.to_string(),
+                &self.state.to_string(),
+                &self.spec.admin_state,
+                &self.spec.cluster,
+            );
+        }
+    }
+
+    /// Update the last activity timestamp.
+    fn update_activity(&self) {
+        self.last_activity
+            .store(chrono::Utc::now().timestamp(), Ordering::Relaxed);
     }
 }
 
@@ -114,6 +166,8 @@ impl Message<GetMachineStatus> for MachineActor {
             state: self.state,
             admin_state: self.spec.admin_state.clone(),
             cluster: self.spec.cluster.clone(),
+            current_booking: self.current_booking.clone(),
+            last_activity: Some(self.last_activity.load(Ordering::Relaxed)),
         }
     }
 }
@@ -207,12 +261,15 @@ impl Message<ProvisionMachine> for MachineActor {
             "Starting provisioning"
         );
 
-        self.state = MachineState::Provisioning;
-        self.current_booking = Some(msg.booking_id);
+        self.current_booking = Some(msg.booking_id.clone());
+        self.transition_to(MachineState::Provisioning);
+
+        // Emit booking started event
+        events::booking_started(&self.machine_id, &msg.booking_id, &self.spec.cluster);
 
         // TODO: Actually trigger BMC/PXE provisioning flow
         // For now, just transition to booked state
-        self.state = MachineState::Booked;
+        self.transition_to(MachineState::Booked);
 
         ProvisionResult {
             success: true,
@@ -258,11 +315,15 @@ impl Message<DeprovisionMachine> for MachineActor {
             "Starting deprovisioning"
         );
 
-        self.state = MachineState::Deprovisioning;
+        self.transition_to(MachineState::Deprovisioning);
 
         // TODO: Actually trigger cleanup/wipe flow
         // For now, just transition back to idle
-        self.state = MachineState::Idle;
+        self.transition_to(MachineState::Idle);
+
+        // Emit booking ended event (duration would be calculated from actual timestamps)
+        events::booking_ended(&self.machine_id, &msg.booking_id, &self.spec.cluster, 0);
+
         self.current_booking = None;
 
         DeprovisionResult {

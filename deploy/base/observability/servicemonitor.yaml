@@ -1,0 +1,42 @@
+# ServiceMonitor for Prometheus Operator (optional - use if you have Prometheus Operator installed)
+# This provides automatic service discovery for Prometheus Operator deployments
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: neolaas
+  namespace: infra
+  labels:
+    app: neolaas
+    release: prometheus  # Match your Prometheus Operator release label
+spec:
+  selector:
+    matchLabels:
+      app: neolaas
+  namespaceSelector:
+    matchNames:
+      - infra
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+# PodMonitor alternative (scrapes pods directly, works better with headless services)
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: neolaas
+  namespace: infra
+  labels:
+    app: neolaas
+spec:
+  selector:
+    matchLabels:
+      app: neolaas
+  namespaceSelector:
+    matchNames:
+      - infra
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

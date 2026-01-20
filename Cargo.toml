@@ -22,7 +22,7 @@ serde_json = "1.0"
 anyhow = "1.0"
 thiserror = "2.0"
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 
 # actor framework
 kameo = { version = "0.19.2", features = ["remote", "tracing"] }
@@ -53,7 +53,7 @@ libp2p = { version = "0.56.0", features = [
   "kad",
   "identify",
 ] }
-etcd-client = { version = "0.17", features = ["raw-channel"] }
+etcd-client = { version = "0.18", features = ["raw-channel"] }
 tonic = "0.14"
 hickory-resolver = "0.25"
 http = "1.2"
@@ -65,6 +65,16 @@ clap = { version = "4.5", features = ["derive", "env"] }
 uuid = { version = "1.0", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 backoff = { version = "0.4", features = ["tokio"] }
+
+# metrics
+metrics = "0.24"
+metrics-exporter-prometheus = "0.18.1"
+
+# OpenTelemetry
+opentelemetry = "0.31"
+opentelemetry_sdk = { version = "0.31", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.31", features = ["grpc-tonic"] }
+tracing-opentelemetry = "0.32"
 
 [profile.release]
 opt-level = 3

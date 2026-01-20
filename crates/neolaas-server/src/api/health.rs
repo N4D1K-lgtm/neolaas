@@ -6,6 +6,7 @@ use super::state::AppState;
 use axum::{extract::State, http::StatusCode};
 
 /// Liveness probe endpoint. Verifies etcd connection is healthy.
+#[tracing::instrument(skip(state))]
 pub async fn health_check(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
     let etcd_check = tokio::time::timeout(tokio::time::Duration::from_secs(2), async {
         let mut client = state.etcd_client.write().await;
@@ -27,6 +28,7 @@ pub async fn health_check(State(state): State<AppState>) -> Result<&'static str,
 }
 
 /// Readiness probe endpoint. Returns OK after discovery convergence completes.
+#[tracing::instrument(skip(state))]
 pub async fn readiness_check(State(state): State<AppState>) -> Result<&'static str, StatusCode> {
     if state.readiness.load(std::sync::atomic::Ordering::Acquire) {
         Ok("READY")
