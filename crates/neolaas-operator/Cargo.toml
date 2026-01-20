@@ -34,7 +34,7 @@ clap = { workspace = true }
 
 # Strict types
 macaddr = { version = "1.0", features = ["serde"] }
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 
 # Serialization
 serde_yaml = "0.9"
