@@ -87,16 +87,28 @@ command = "cargo"
 args = ["build"]
 
 [tasks.build-image]
-description = "Build neolaas container image"
-command = "docker"
-args = [
-  "build",
-  "-t",
-  "${IMAGE_NAME}:${IMAGE_TAG}",
-  "-f",
-  "images/neolaas/Dockerfile",
-  ".",
-]
+description = "Build neolaas container image with git metadata"
+script = '''
+GIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+GIT_COMMIT_TIMESTAMP=$(git log -1 --format=%cI 2>/dev/null || echo "unknown")
+GIT_DIRTY=$(git diff --quiet 2>/dev/null && echo "false" || echo "true")
+
+echo "Building ${IMAGE_NAME}:${IMAGE_TAG} with git metadata:"
+echo "  SHA: $GIT_SHA"
+echo "  Branch: $GIT_BRANCH"
+echo "  Commit Time: $GIT_COMMIT_TIMESTAMP"
+echo "  Dirty: $GIT_DIRTY"
+
+docker build \
+  --build-arg VERGEN_GIT_SHA="$GIT_SHA" \
+  --build-arg VERGEN_GIT_BRANCH="$GIT_BRANCH" \
+  --build-arg VERGEN_GIT_COMMIT_TIMESTAMP="$GIT_COMMIT_TIMESTAMP" \
+  --build-arg VERGEN_GIT_DIRTY="$GIT_DIRTY" \
+  -t "${IMAGE_NAME}:${IMAGE_TAG}" \
+  -f images/neolaas/Dockerfile \
+  .
+'''
 dependencies = ["build-bin"]
 
 [tasks.kind-load-image]
