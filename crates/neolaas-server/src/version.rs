@@ -1,8 +1,3 @@
-//! Build-time version metadata
-//!
-//! Provides version constants and protocol version string for P2P identity.
-//! All values are injected at compile time via build.rs using vergen.
-
 /// Crate version from Cargo.toml
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -28,7 +23,6 @@ pub const BUILD_TIMESTAMP: &str = env!("VERGEN_BUILD_TIMESTAMP");
 pub const TARGET: &str = env!("VERGEN_CARGO_TARGET_TRIPLE");
 
 /// Protocol version string for libp2p identify.
-/// Format: /neolaas/<semver>
 pub const PROTOCOL_VERSION: &str = concat!("/neolaas/", env!("CARGO_PKG_VERSION"));
 
 /// Returns full version string with git metadata.
