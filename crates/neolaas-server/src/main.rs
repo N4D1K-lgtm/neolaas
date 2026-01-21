@@ -23,7 +23,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!(
         version = version::VERSION,
+        protocol_version = version::PROTOCOL_VERSION,
         git_sha = version::GIT_SHA,
+        git_branch = version::GIT_BRANCH,
+        git_commit_timestamp = version::GIT_COMMIT_TIMESTAMP,
+        git_dirty = version::GIT_DIRTY,
+        build_timestamp = version::BUILD_TIMESTAMP,
+        rustc_version = version::RUSTC_VERSION,
+        target = version::TARGET,
         "Starting Neolaas Server"
     );
 
