@@ -7,6 +7,7 @@
 //! - Kademlia: DHT for peer routing (configured for LAN/datacenter use)
 
 use super::config::NetworkConfig;
+use crate::version::PROTOCOL_VERSION;
 use kameo::remote;
 use libp2p::{identify, kad, mdns, swarm::NetworkBehaviour, PeerId};
 
@@ -33,7 +34,7 @@ impl NeolaasNetworkBehaviour {
         );
 
         let identify = identify::Behaviour::new(identify::Config::new(
-            "/neolaas/1.0.0".to_string(),
+            PROTOCOL_VERSION.to_string(),
             local_public_key.clone(),
         ));
 

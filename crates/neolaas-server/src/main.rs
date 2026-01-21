@@ -10,6 +10,7 @@
 use neolaas_server::api;
 use neolaas_server::network::create_etcd_client;
 use neolaas_server::observability::{init_metrics, init_tracing, shutdown_tracing, TracingConfig};
+use neolaas_server::version;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
@@ -20,7 +21,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let tracing_config = TracingConfig::from_env();
     init_tracing(tracing_config)?;
 
-    info!("Starting Neolaas Server");
+    info!(
+        version = version::VERSION,
+        git_sha = version::GIT_SHA,
+        "Starting Neolaas Server"
+    );
 
     // Initialize Prometheus metrics
     let metrics_state = match init_metrics() {
