@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: infra
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      # Scrape neolaas pods directly via headless service
+      - job_name: 'neolaas'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - infra
+        relabel_configs:
+          # Only scrape pods with app=neolaas label
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: neolaas
+          # Set the metrics path
+          - source_labels: []
+            target_label: __metrics_path__
+            replacement: /metrics
+          # Use pod IP and port 8080
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: ${1}:8080
+          # Add pod name as instance label
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: instance
+          # Add node name label
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+
+      # Scrape Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Scrape etcd (if metrics are enabled)
+      - job_name: 'etcd'
+        static_configs:
+          - targets: ['etcd.infra.svc.cluster.local:2379']
+
+      # Scrape Tempo for service graph metrics
+      - job_name: 'tempo'
+        static_configs:
+          - targets: ['tempo.infra.svc.cluster.local:3200']
+
+      # Scrape Loki
+      - job_name: 'loki'
+        static_configs:
+          - targets: ['loki.infra.svc.cluster.local:3100']
+
+      # Scrape Grafana
+      - job_name: 'grafana'
+        static_configs:
+          - targets: ['grafana.infra.svc.cluster.local:3000']

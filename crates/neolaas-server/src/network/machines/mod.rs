@@ -1,7 +1,7 @@
 //! Machine Actor Module
 //!
 //! Provides MachineActors that manage individual physical machines,
-//! coordinated by the MachineActorManager using Maglev consistent hashing.
+//! coordinated by the MachineActorManager using Rendezvous consistent hashing.
 //!
 //! ## Architecture
 //!
@@ -41,9 +41,9 @@ mod manager;
 mod messages;
 
 pub use actor::{MachineActor, MachineSpec};
-pub use manager::{spawn_machine_actor_manager, MachineActorManager};
+pub use manager::{spawn_machine_actor_manager_actor, MachineActorManagerActor};
 pub use messages::{
-    CheckOwnership, DeprovisionMachine, DeprovisionResult, GetMachineStatus, MachineState,
-    MachineStatus, OwnershipCheckResult, ProvisionConfig, ProvisionMachine, ProvisionResult,
-    UpdateAck, UpdateMachineSpec,
+    CheckOwnership, DeprovisionMachine, DeprovisionResult, GetAllMachineStatuses, GetMachineStatus,
+    MachineState, MachineStatus, OwnershipCheckResult, ProvisionConfig, ProvisionMachine,
+    ProvisionResult, SyncAllMachines, SyncResult, UpdateAck, UpdateMachineSpec,
 };

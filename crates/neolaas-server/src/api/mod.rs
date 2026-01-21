@@ -6,10 +6,14 @@
 //! - `state`: Shared application state
 //! - `health`: Liveness and readiness probes
 //! - `p2p`: P2P network statistics and broadcast
+//! - `metrics`: Prometheus metrics endpoint
+//! - `machines`: Machine actor state endpoint
 
 mod health;
 // TODO: Re-enable once MachineActor is implemented in sharding module
 // mod hosts;
+mod machines;
+mod metrics;
 mod p2p;
 mod state;
 
@@ -26,6 +30,10 @@ pub fn create_router(state: AppState) -> Router {
         // Health checks
         .route("/health", get(health::health_check))
         .route("/ready", get(health::readiness_check))
+        // Observability
+        .route("/metrics", get(metrics::get_metrics))
+        // Actor state
+        .route("/actors/machines", get(machines::get_machines))
         // TODO: Re-enable host routes once MachineActor is implemented
         // .route("/hosts", post(hosts::create_host_actor))
         // .route("/hosts/{host_id}/provision", post(hosts::provision_host))

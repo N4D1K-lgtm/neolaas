@@ -34,3 +34,10 @@ tonic = { workspace = true }
 hickory-resolver = { workspace = true }
 http = { workspace = true }
 async-trait = "0.1"
+
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+tracing-opentelemetry = { workspace = true }

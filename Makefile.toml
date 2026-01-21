@@ -19,6 +19,7 @@ description = "Install CloudNativePG operator"
 command = "kubectl"
 args = [
   "apply",
+  "--validate=false",
   "-f",
   "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.22/releases/cnpg-1.22.0.yaml",
 ]
@@ -193,18 +194,78 @@ description = "Deploy full stack and seed test data"
 dependencies = ["deploy", "seed-inventory"]
 
 ###############################################################################
+# Observability
+###############################################################################
+
+[tasks.prometheus]
+description = "Port-forward Prometheus UI (localhost:9090)"
+command = "kubectl"
+args = ["port-forward", "-n", "${NAMESPACE}", "svc/prometheus", "9090:9090"]
+
+[tasks.grafana]
+description = "Port-forward Grafana UI (localhost:3000)"
+command = "kubectl"
+args = ["port-forward", "-n", "${NAMESPACE}", "svc/grafana", "3000:3000"]
+
+[tasks.tempo]
+description = "Port-forward Tempo API (localhost:3200)"
+command = "kubectl"
+args = ["port-forward", "-n", "${NAMESPACE}", "svc/tempo", "3200:3200"]
+
+[tasks.loki]
+description = "Port-forward Loki API (localhost:3100)"
+command = "kubectl"
+args = ["port-forward", "-n", "${NAMESPACE}", "svc/loki", "3100:3100"]
+
+[tasks.metrics]
+description = "Fetch metrics from neolaas-0"
+script = '''
+kubectl exec -n ${NAMESPACE} neolaas-0 -- curl -s localhost:8080/metrics | grep neolaas_
+'''
+
+[tasks.actors]
+description = "Get actor states from neolaas-0"
+script = '''
+kubectl exec -n ${NAMESPACE} neolaas-0 -- curl -s localhost:8080/actors/machines | jq
+'''
+
+[tasks.events]
+description = "Tail structured events (requires LOG_FORMAT=json)"
+script = '''
+kubectl logs -n ${NAMESPACE} -l app=neolaas -f --tail=50 | jq 'select(.event_type)' 2>/dev/null || \
+kubectl logs -n ${NAMESPACE} -l app=neolaas -f --tail=50
+'''
+
+###############################################################################
 # Observe
 ###############################################################################
 
 [tasks.logs]
 description = "Tail neolaas logs"
 command = "kubectl"
-args = ["logs", "-n", "${NAMESPACE}", "-l", "app=neolaas", "-f", "--tail=100", "--prefix=true"]
+args = [
+  "logs",
+  "-n",
+  "${NAMESPACE}",
+  "-l",
+  "app=neolaas",
+  "-f",
+  "--tail=100",
+  "--prefix=true",
+]
 
 [tasks.logs-operator]
 description = "Tail neolaas-operator logs"
 command = "kubectl"
-args = ["logs", "-n", "${NAMESPACE}", "-l", "app=neolaas-operator", "-f", "--tail=100"]
+args = [
+  "logs",
+  "-n",
+  "${NAMESPACE}",
+  "-l",
+  "app=neolaas-operator",
+  "-f",
+  "--tail=100",
+]
 
 [tasks.logs-pod]
 description = "Tail specific pod logs (usage: cargo make logs-pod -- neolaas-0)"

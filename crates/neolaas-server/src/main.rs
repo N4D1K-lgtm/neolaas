@@ -1,30 +1,38 @@
 //! Neolaas Server - Distributed Baremetal Host Allocator
 //!
 //! Entry point for the neolaas server. Initializes:
-//! - Tracing/logging with configurable levels via RUST_LOG
+//! - Tracing/logging with configurable levels via RUST_LOG (and optional OpenTelemetry)
+//! - Prometheus metrics for observability
 //! - etcd client for distributed state
 //! - P2P network for peer discovery and actor messaging
 //! - HTTP API server for client requests
 
 use neolaas_server::api;
 use neolaas_server::network::create_etcd_client;
+use neolaas_server::observability::{init_metrics, init_tracing, shutdown_tracing, TracingConfig};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, level_filters::LevelFilter};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use tracing::{debug, error, info};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(
-            EnvFilter::builder()
-                .with_default_directive(LevelFilter::INFO.into())
-                .from_env_lossy(),
-        )
-        .init();
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Initialize tracing first (with optional OpenTelemetry export)
+    let tracing_config = TracingConfig::from_env();
+    init_tracing(tracing_config)?;
 
     info!("Starting Neolaas Server");
+
+    // Initialize Prometheus metrics
+    let metrics_state = match init_metrics() {
+        Ok(state) => {
+            info!("Prometheus metrics initialized");
+            Some(state)
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to initialize metrics, continuing without metrics");
+            None
+        }
+    };
 
     let etcd_endpoints = std::env::var("ETCD_ENDPOINTS")
         .unwrap_or_else(|_| "http://127.0.0.1:2379".to_string())
@@ -34,9 +42,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let bind_addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
 
-    let node_id = std::env::var("NODE_ID").unwrap_or_else(|_| {
-        format!("neolaas-node-{}", uuid::Uuid::new_v4())
-    });
+    let node_id = std::env::var("NODE_ID")
+        .unwrap_or_else(|_| format!("neolaas-node-{}", uuid::Uuid::new_v4()));
 
     info!(
         node_id = %node_id,
@@ -49,8 +56,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let etcd_client = Arc::new(RwLock::new(etcd_client));
     debug!("Connected to etcd");
 
-    let (peer_id, ping_actor, sharding_coordinator, shutdown_tx, readiness) =
-        neolaas_server::network::init::initialize_p2p_network(node_id.clone(), etcd_client.clone()).await?;
+    let (peer_id, ping_actor, sharding_coordinator, machine_manager, shutdown_tx, readiness) =
+        neolaas_server::network::init::initialize_p2p_network(node_id.clone(), etcd_client.clone())
+            .await?;
     info!(peer_id = %peer_id, "P2P network initialized");
 
     let state = api::AppState {
@@ -59,7 +67,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         peer_id: Some(peer_id),
         ping_actor: Some(ping_actor),
         sharding_coordinator: Some(sharding_coordinator),
+        machine_manager: Some(machine_manager),
         readiness,
+        metrics_state,
     };
 
     let app = api::create_router(state);
@@ -87,6 +97,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     debug!("Signaling DiscoveryController to shutdown");
     let _ = shutdown_tx.send(());
+
+    // Shutdown tracing to flush any pending traces
+    shutdown_tracing();
 
     // Allow time for graceful shutdown (lease revocation and DELETE propagation)
     tokio::time::sleep(tokio::time::Duration::from_secs(7)).await;

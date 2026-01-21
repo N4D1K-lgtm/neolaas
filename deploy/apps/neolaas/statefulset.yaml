@@ -18,6 +18,10 @@ spec:
     metadata:
       labels:
         app: neolaas
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
     spec:
       terminationGracePeriodSeconds: 30
       containers:
@@ -60,6 +64,16 @@ spec:
 
             - name: DATABASE_URL
               value: postgresql://neolaas:neolaas-dev-password@neolaas-db-rw.infra.svc.cluster.local:5432/neolaas
+
+            # Observability configuration (Grafana Tempo)
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo.infra.svc.cluster.local:4317"
+            - name: OTEL_SERVICE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: LOG_FORMAT
+              value: "text"  # Set to "json" for structured JSON logs
 
           ports:
             - containerPort: 8080
