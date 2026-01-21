@@ -7,8 +7,9 @@
 //! - Kademlia: DHT for peer routing (configured for LAN/datacenter use)
 
 use super::config::NetworkConfig;
+use crate::version::{PROTOCOL_VERSION, full_version};
 use kameo::remote;
-use libp2p::{identify, kad, mdns, swarm::NetworkBehaviour, PeerId};
+use libp2p::{PeerId, identify, kad, mdns, swarm::NetworkBehaviour};
 
 /// Combined network behaviour for P2P communication.
 #[derive(NetworkBehaviour)]
@@ -32,10 +33,10 @@ impl NeolaasNetworkBehaviour {
                 .with_max_concurrent_streams(config.kameo_max_streams as usize),
         );
 
-        let identify = identify::Behaviour::new(identify::Config::new(
-            "/neolaas/1.0.0".to_string(),
-            local_public_key.clone(),
-        ));
+        let identify = identify::Behaviour::new(
+            identify::Config::new(PROTOCOL_VERSION.to_string(), local_public_key.clone())
+                .with_agent_version(full_version()),
+        );
 
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?;
 

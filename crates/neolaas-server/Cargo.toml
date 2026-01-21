@@ -2,6 +2,7 @@
 name = "neolaas-server"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -41,3 +42,7 @@ opentelemetry = { workspace = true }
 opentelemetry_sdk = { workspace = true }
 opentelemetry-otlp = { workspace = true }
 tracing-opentelemetry = { workspace = true }
+
+[build-dependencies]
+vergen-gitcl = { version = "9.1.0", features = ["build", "cargo", "rustc"] }
+anyhow = { workspace = true }

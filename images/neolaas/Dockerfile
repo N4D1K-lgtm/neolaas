@@ -21,6 +21,17 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 FROM chef AS builder
 
+# Git build metadata (passed from CI/build script)
+ARG VERGEN_GIT_SHA="unknown"
+ARG VERGEN_GIT_BRANCH="unknown"
+ARG VERGEN_GIT_COMMIT_TIMESTAMP="unknown"
+ARG VERGEN_GIT_DIRTY="false"
+
+ENV VERGEN_GIT_SHA=${VERGEN_GIT_SHA}
+ENV VERGEN_GIT_BRANCH=${VERGEN_GIT_BRANCH}
+ENV VERGEN_GIT_COMMIT_TIMESTAMP=${VERGEN_GIT_COMMIT_TIMESTAMP}
+ENV VERGEN_GIT_DIRTY=${VERGEN_GIT_DIRTY}
+
 WORKDIR /app
 
 COPY --from=cacher /app/target target
