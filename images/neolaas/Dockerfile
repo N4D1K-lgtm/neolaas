@@ -1,4 +1,4 @@
-FROM rust:1.92.0-trixie AS chef
+FROM rust:1.93.0-trixie AS chef
 
 RUN cargo install cargo-chef && apt-get update && \
   apt-get -y --no-install-recommends install protobuf-compiler=3.21.12-11 && \
