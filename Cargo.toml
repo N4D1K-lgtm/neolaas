@@ -56,7 +56,7 @@ libp2p = { version = "0.56.0", features = [
 ] }
 etcd-client = { version = "0.18", features = ["raw-channel"] }
 tonic = "0.14"
-hickory-resolver = "0.25"
+hickory-resolver = "0.26"
 http = "1.2"
 
 # cli
